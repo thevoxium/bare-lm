@@ -18,6 +18,7 @@ typedef enum Op {
   EXP,
   LOG,
   SUM_REDUCTION,
+  MEAN_REDUCTION,
 } Op;
 
 typedef struct Tensor {
@@ -47,5 +48,6 @@ Tensor *pow_t(Tensor *a, float exponent);
 Tensor *exp_t(Tensor *a);
 Tensor *log_t(Tensor *a);
 Tensor *sum_t(Tensor *a, int dim);
+Tensor *mean_t(Tensor *a, int dim);
 
 #endif // !BARE_H

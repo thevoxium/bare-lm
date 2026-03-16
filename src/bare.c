@@ -581,3 +581,48 @@ Tensor *sum_t(Tensor *a, int dim) {
 
   return out;
 }
+
+static void backward_mean(Tensor *self) {
+  Tensor *a = self->parents[0];
+
+  int dim = find_reduced_dim(a, self);
+  if (dim < 0) {
+    ERROR("backward_mean: could not determine reduced dimension");
+    return;
+  }
+  int R = a->shape[dim];
+
+  int outer = 1, inner = 1;
+  int reduce = a->shape[dim];
+
+  for (int i = 0; i < dim; i++)
+    outer *= a->shape[i];
+
+  for (int i = dim + 1; i < a->ndim; i++)
+    inner *= a->shape[i];
+
+  for (int o = 0; o < outer; o++) {
+    int base = o * reduce * inner;
+    for (int i = 0; i < inner; i++) {
+      float grad = self->grad[o * inner + i];
+      for (int r = 0; r < reduce; r++) {
+        int idx = base + r * inner + i;
+        a->grad[idx] += (grad / R);
+      }
+    }
+  }
+}
+Tensor *mean_t(Tensor *a, int dim) {
+  Tensor *r = sum_t(a, dim);
+  if (!r) {
+    ERROR("mean_t: sum_t failed");
+    return NULL;
+  }
+  int R = a->shape[dim];
+  for (int i = 0; i < r->numel; i++)
+    r->data[i] /= R;
+
+  r->op = MEAN_REDUCTION;
+  r->backward = backward_mean;
+  return r;
+}
