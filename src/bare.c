@@ -186,6 +186,27 @@ Tensor *tensor_init(int64_t *shape, int ndim) {
   return t;
 }
 
+Tensor *tensor_zeros(int64_t *shape, int ndim) {
+  Tensor *t = tensor_init(shape, ndim);
+  if (!t) {
+    ERROR("tensor_zeros: tensor_init failed");
+    return NULL;
+  }
+  return t;
+}
+
+Tensor *tensor_ones(int64_t *shape, int ndim) {
+  Tensor *t = tensor_init(shape, ndim);
+  if (!t) {
+    ERROR("tensor_ones: tensor_init failed");
+    return NULL;
+  }
+  for (int i = 0; i < t->numel; i++) {
+    t->data[i] = 1.0f;
+  }
+  return t;
+}
+
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];

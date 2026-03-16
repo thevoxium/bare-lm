@@ -33,6 +33,8 @@ typedef struct Tensor {
 void backward(Tensor *root);
 
 Tensor *tensor_init(int64_t *shape, int ndim);
+Tensor *tensor_zeros(int64_t *shape, int ndim);
+Tensor *tensor_ones(int64_t *shape, int ndim);
 void print_t(Tensor *t, uint8_t grad);
 
 Tensor *add_t(Tensor *a, Tensor *b);
