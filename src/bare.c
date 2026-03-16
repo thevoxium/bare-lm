@@ -626,3 +626,34 @@ Tensor *mean_t(Tensor *a, int dim) {
   r->backward = backward_mean;
   return r;
 }
+
+static void backward_dot(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *b = self->parents[1];
+
+  float grad = self->grad[0];
+  for (int i = 0; i < a->numel; i++) {
+    a->grad[i] += (grad * b->data[i]);
+    b->grad[i] += (grad * a->data[i]);
+  }
+}
+
+Tensor *dot_t(Tensor *a, Tensor *b) {
+  if (!a || !b || a->ndim != b->ndim || a->ndim != 1 ||
+      a->shape[0] != b->shape[0]) {
+    ERROR("dot_t: invalid param");
+    return NULL;
+  }
+
+  int64_t shape[] = {1};
+  Tensor *r = tensor_zeros(shape, 1);
+  for (int i = 0; i < a->numel; i++) {
+    r->data[0] += (a->data[i] * b->data[i]);
+  }
+
+  r->op = DOT;
+  r->parents[0] = a;
+  r->parents[1] = b;
+  r->backward = backward_dot;
+  return r;
+}
