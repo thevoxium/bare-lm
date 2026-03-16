@@ -489,3 +489,95 @@ Tensor *log_t(Tensor *a) {
 
   return r;
 }
+
+static int find_reduced_dim(Tensor *a, Tensor *out) {
+  for (int i = 0, j = 0; i < a->ndim; i++) {
+    if (j >= out->ndim || a->shape[i] != out->shape[j]) {
+      return i;
+    }
+    j++;
+  }
+  return -1;
+}
+
+static void backward_sum(Tensor *self) {
+  Tensor *a = self->parents[0];
+
+  int dim = find_reduced_dim(a, self);
+  if (dim < 0) {
+    ERROR("backward_sum: could not determine reduced dimension");
+    return;
+  }
+
+  int outer = 1, inner = 1;
+  int reduce = a->shape[dim];
+
+  for (int i = 0; i < dim; i++)
+    outer *= a->shape[i];
+
+  for (int i = dim + 1; i < a->ndim; i++)
+    inner *= a->shape[i];
+
+  for (int o = 0; o < outer; o++) {
+    int base = o * reduce * inner;
+    for (int i = 0; i < inner; i++) {
+      float grad = self->grad[o * inner + i];
+      for (int r = 0; r < reduce; r++) {
+        int idx = base + r * inner + i;
+        a->grad[idx] += grad;
+      }
+    }
+  }
+}
+
+Tensor *sum_t(Tensor *a, int dim) {
+  if (!a || dim >= a->ndim || dim < 0) {
+    ERROR("sum_t: param invalid");
+    return NULL;
+  }
+
+  int out_ndim;
+  int64_t shape[a->ndim];
+
+  if (a->ndim == 1) {
+    out_ndim = 1;
+    shape[0] = 1;
+  } else {
+    int j = 0;
+    for (int i = 0; i < a->ndim; i++) {
+      if (i != dim) {
+        shape[j++] = a->shape[i];
+      }
+    }
+    out_ndim = a->ndim - 1;
+  }
+
+  Tensor *out = tensor_init(shape, out_ndim);
+  if (!out) {
+    ERROR("sum_t: out failed");
+    return NULL;
+  }
+
+  int outer = 1, inner = 1, reduce = a->shape[dim];
+  for (int i = 0; i < dim; i++)
+    outer *= a->shape[i];
+  for (int i = dim + 1; i < a->ndim; i++)
+    inner *= a->shape[i];
+
+  for (int o = 0; o < outer; o++) {
+    for (int i = 0; i < inner; i++) {
+      float sum = 0.0f;
+      for (int r = 0; r < reduce; r++) {
+        sum += a->data[o * reduce * inner + r * inner + i];
+      }
+      out->data[o * inner + i] = sum;
+    }
+  }
+
+  out->parents[0] = a;
+  out->parents[1] = NULL;
+  out->op = SUM_REDUCTION;
+  out->backward = backward_sum;
+
+  return out;
+}
