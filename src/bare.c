@@ -1066,6 +1066,10 @@ Tensor *transpose_t(Tensor *a) {
   }
   int64_t result_shape[] = {a->shape[1], a->shape[0]};
   Tensor *r = tensor_zeros(result_shape, 2);
+  if (!r) {
+    ERROR("transpose_t: result tensor failed");
+    return NULL;
+  }
 
   for (int i = 0; i < result_shape[0]; i++) {
     for (int j = 0; j < result_shape[1]; j++) {
@@ -1077,5 +1081,43 @@ Tensor *transpose_t(Tensor *a) {
   r->parents[1] = NULL;
   r->backward = backward_transpose;
   r->op = TRANSPOSE;
+  return r;
+}
+
+static void backward_reshape(Tensor *self) {
+  Tensor *a = self->parents[0];
+  for (int i = 0; i < self->numel; i++) {
+    a->grad[i] += self->grad[i];
+  }
+}
+
+Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim) {
+  if (!a) {
+    ERROR("reshape_t: invalid param");
+    return NULL;
+  }
+
+  int numel = 1;
+  for (int i = 0; i < ndim; i++) {
+    numel *= shape[i];
+  }
+  if (numel != a->numel) {
+    ERROR("reshape_t: numel does not match");
+    return NULL;
+  }
+
+  Tensor *r = tensor_zeros(shape, ndim);
+  if (!r) {
+    ERROR("reshape_t: result tensor failed");
+    return NULL;
+  }
+  for (int i = 0; i < numel; i++) {
+    r->data[i] = a->data[i];
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = RESHAPE;
+  r->backward = backward_reshape;
   return r;
 }
