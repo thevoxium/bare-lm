@@ -929,3 +929,36 @@ Tensor *tanh_t(Tensor *a) {
 
   return r;
 }
+
+static void backward_mse(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *b = self->parents[1];
+
+  float scale = self->grad[0] * (2.0f / a->numel);
+
+  for (int i = 0; i < a->numel; i++) {
+    float diff = a->data[i] - b->data[i];
+
+    a->grad[i] += scale * diff;
+    b->grad[i] -= scale * diff;
+  }
+}
+
+Tensor *mseloss_t(Tensor *a, Tensor *b) {
+  if (!a || !b || a->numel != b->numel) {
+    ERROR("mseloss_t: invalid params");
+    return NULL;
+  }
+
+  int64_t shape[] = {1};
+  Tensor *r = tensor_zeros(shape, 1);
+  for (int i = 0; i < a->numel; i++) {
+    r->data[0] += ((a->data[i] - b->data[i]) * (a->data[i] - b->data[i]));
+  }
+  r->data[0] /= a->numel;
+  r->op = MSELOSS;
+  r->parents[0] = a;
+  r->parents[1] = b;
+  r->backward = backward_mse;
+  return r;
+}
