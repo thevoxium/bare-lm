@@ -695,3 +695,56 @@ Tensor *dot_t(Tensor *a, Tensor *b) {
   r->backward = backward_dot;
   return r;
 }
+
+static inline float max_f(float a, float b) { return a > b ? a : b; }
+static inline float min_f(float a, float b) { return a < b ? a : b; }
+
+Tensor *max_t(Tensor *a, int dim) {
+  if (!a || dim >= a->ndim || dim < 0) {
+    ERROR("max_t: param invalid");
+    return NULL;
+  }
+  int out_ndim;
+  int64_t shape[a->ndim];
+
+  if (a->ndim == 1) {
+    out_ndim = 1;
+    shape[0] = 1;
+  } else {
+    int j = 0;
+    for (int i = 0; i < a->ndim; i++) {
+      if (i != dim) {
+        shape[j++] = a->shape[i];
+      }
+    }
+    out_ndim = a->ndim - 1;
+  }
+
+  Tensor *out = tensor_init(shape, out_ndim);
+  if (!out) {
+    ERROR("max_t: out failed");
+    return NULL;
+  }
+
+  int outer = 1, inner = 1, reduce = a->shape[dim];
+  for (int i = 0; i < dim; i++)
+    outer *= a->shape[i];
+  for (int i = dim + 1; i < a->ndim; i++)
+    inner *= a->shape[i];
+
+  for (int o = 0; o < outer; o++) {
+    for (int i = 0; i < inner; i++) {
+      float m = -1e9;
+      for (int r = 0; r < reduce; r++) {
+        m = max_f(m, a->data[o * reduce * inner + r * inner + i]);
+      }
+      out->data[o * inner + i] = m;
+    }
+  }
+
+  out->parents[0] = a;
+  out->parents[1] = NULL;
+  out->op = MAX;
+  out->backward = NULL;
+  return out;
+}

@@ -20,6 +20,7 @@ typedef enum Op {
   SUM_REDUCTION,
   MEAN_REDUCTION,
   DOT,
+  MAX,
 } Op;
 
 typedef struct Tensor {
@@ -54,5 +55,6 @@ Tensor *log_t(Tensor *a);
 Tensor *sum_t(Tensor *a, int dim);
 Tensor *mean_t(Tensor *a, int dim);
 Tensor *dot_t(Tensor *a, Tensor *b);
+Tensor *max_t(Tensor *a, int dim);
 
 #endif // !BARE_H
