@@ -962,3 +962,60 @@ Tensor *mseloss_t(Tensor *a, Tensor *b) {
   r->backward = backward_mse;
   return r;
 }
+
+static void backward_matmul(Tensor *self) {
+  Tensor *a = self->parents[0]; // (m, n)
+  Tensor *b = self->parents[1]; // (n, p)
+
+  int m = a->shape[0];
+  int n = a->shape[1];
+  int p = b->shape[1];
+
+  // dA = dC @ B^T
+  for (int i = 0; i < m; i++) {
+    for (int k = 0; k < n; k++) {
+      float sum = 0.0f;
+      for (int j = 0; j < p; j++) {
+        sum += self->grad[i * p + j] * b->data[k * p + j]; // B[k,j]
+      }
+      a->grad[i * n + k] += sum;
+    }
+  }
+
+  // dB = A^T @ dC
+  for (int k = 0; k < n; k++) {
+    for (int j = 0; j < p; j++) {
+      float sum = 0.0f;
+      for (int i = 0; i < m; i++) {
+        sum += a->data[i * n + k] * self->grad[i * p + j];
+      }
+      b->grad[k * p + j] += sum;
+    }
+  }
+}
+
+Tensor *matmul_t(Tensor *a, Tensor *b) {
+  if (!a || !b || a->ndim != b->ndim || a->ndim != 2 ||
+      a->shape[1] != b->shape[0]) {
+    ERROR("matmul_t: invalid param");
+    return NULL;
+  }
+  int64_t result_shape[] = {a->shape[0], b->shape[1]};
+  Tensor *r = tensor_zeros(result_shape, 2);
+
+  for (int i = 0; i < a->shape[0]; i++) {
+    for (int j = 0; j < b->shape[1]; j++) {
+      float sum = 0.0f;
+      for (int k = 0; k < a->shape[1]; k++) {
+        sum += (a->data[i * a->shape[1] + k] * b->data[k * b->shape[1] + j]);
+      }
+      r->data[i * result_shape[1] + j] = sum;
+    }
+  }
+
+  r->op = MATMUL;
+  r->parents[0] = a;
+  r->parents[1] = b;
+  r->backward = backward_matmul;
+  return r;
+}

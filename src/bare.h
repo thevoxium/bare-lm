@@ -26,6 +26,7 @@ typedef enum Op {
   SIGMOID,
   TANH,
   MSELOSS,
+  MATMUL,
 } Op;
 
 typedef struct Tensor {
@@ -66,5 +67,6 @@ Tensor *gelu_t(Tensor *a);
 Tensor *sigmoid_t(Tensor *a);
 Tensor *tanh_t(Tensor *a);
 Tensor *mseloss_t(Tensor *a, Tensor *b);
+Tensor *matmul_t(Tensor *a, Tensor *b);
 
 #endif // !BARE_H
