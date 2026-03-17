@@ -245,6 +245,31 @@ Tensor *tensor_ones(int64_t *shape, int ndim) {
   return t;
 }
 
+Tensor *tensor_randn(int64_t *shape, int ndim) {
+  Tensor *t = tensor_init(shape, ndim);
+  if (!t) {
+    ERROR("tensor_randn: tensor_init failed");
+    return NULL;
+  }
+
+  for (int i = 0; i < t->numel; i += 2) {
+    float u1, u2;
+    do {
+      u1 = (float)rand() / (float)RAND_MAX;
+    } while (u1 == 0.0f);
+    u2 = (float)rand() / (float)RAND_MAX;
+
+    float r = sqrtf(-2.0f * logf(u1));
+    float theta = 2.0f * (float)M_PI * u2;
+
+    t->data[i] = r * cosf(theta);
+    if (i + 1 < t->numel) {
+      t->data[i + 1] = r * sinf(theta);
+    }
+  }
+  return t;
+}
+
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];

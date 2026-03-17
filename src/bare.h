@@ -46,6 +46,7 @@ void backward(Tensor *root);
 Tensor *tensor_init(int64_t *shape, int ndim);
 Tensor *tensor_zeros(int64_t *shape, int ndim);
 Tensor *tensor_ones(int64_t *shape, int ndim);
+Tensor *tensor_randn(int64_t *shape, int ndim);
 float tensor_get(Tensor *t, int64_t *indices);
 void print_t(Tensor *t, uint8_t grad);
 void tensor_free(Tensor *t);
