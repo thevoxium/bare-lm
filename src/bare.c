@@ -699,6 +699,38 @@ Tensor *dot_t(Tensor *a, Tensor *b) {
 static inline float max_f(float a, float b) { return a > b ? a : b; }
 static inline float min_f(float a, float b) { return a < b ? a : b; }
 
+static void backward_max(Tensor *self) {
+  Tensor *a = self->parents[0];
+  int dim = find_reduced_dim(a, self);
+  int outer = 1, inner = 1;
+  int reduce = a->shape[dim];
+
+  for (int i = 0; i < dim; i++)
+    outer *= a->shape[i];
+
+  for (int i = dim + 1; i < a->ndim; i++)
+    inner *= a->shape[i];
+
+  for (int o = 0; o < outer; o++) {
+    int base = o * reduce * inner;
+    for (int i = 0; i < inner; i++) {
+      float grad = self->grad[o * inner + i];
+      float max_val = -INFINITY;
+      int max_r = 0;
+
+      for (int r = 0; r < reduce; r++) {
+        float v = a->data[base + r * inner + i];
+        if (v > max_val) {
+          max_val = v;
+          max_r = r;
+        }
+      }
+      int idx = base + max_r * inner + i;
+      a->grad[idx] += grad;
+    }
+  }
+}
+
 Tensor *max_t(Tensor *a, int dim) {
   if (!a || dim >= a->ndim || dim < 0) {
     ERROR("max_t: param invalid");
@@ -734,7 +766,7 @@ Tensor *max_t(Tensor *a, int dim) {
 
   for (int o = 0; o < outer; o++) {
     for (int i = 0; i < inner; i++) {
-      float m = -1e9;
+      float m = -INFINITY;
       for (int r = 0; r < reduce; r++) {
         m = max_f(m, a->data[o * reduce * inner + r * inner + i]);
       }
@@ -745,6 +777,6 @@ Tensor *max_t(Tensor *a, int dim) {
   out->parents[0] = a;
   out->parents[1] = NULL;
   out->op = MAX;
-  out->backward = NULL;
+  out->backward = backward_max;
   return out;
 }
