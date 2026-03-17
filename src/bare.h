@@ -26,6 +26,7 @@ typedef struct Tensor {
   float *data;
   float *grad;
   int64_t *shape;
+  int64_t *strides;
   struct Tensor *parents[2];
   int ndim;
   int numel;
@@ -38,7 +39,9 @@ void backward(Tensor *root);
 Tensor *tensor_init(int64_t *shape, int ndim);
 Tensor *tensor_zeros(int64_t *shape, int ndim);
 Tensor *tensor_ones(int64_t *shape, int ndim);
+float tensor_get(Tensor *t, int64_t *indices);
 void print_t(Tensor *t, uint8_t grad);
+void tensor_free(Tensor *t);
 
 Tensor *add_t(Tensor *a, Tensor *b);
 Tensor *sub_t(Tensor *a, Tensor *b);

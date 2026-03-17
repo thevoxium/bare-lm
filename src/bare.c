@@ -157,9 +157,22 @@ Tensor *tensor_init(int64_t *shape, int ndim) {
     return NULL;
   }
 
+  t->strides = malloc(ndim * sizeof(int64_t));
+  if (!t->strides) {
+    ERROR("tensor_init: malloc failed");
+    free(t->shape);
+    free(t);
+    return NULL;
+  }
+
   for (int i = 0; i < ndim; i++) {
     t->shape[i] = shape[i];
     t->numel *= shape[i];
+  }
+
+  t->strides[ndim - 1] = 1;
+  for (int i = ndim - 2; i >= 0; i--) {
+    t->strides[i] = t->strides[i + 1] * shape[i + 1];
   }
 
   t->data = malloc(t->numel * sizeof(float));
@@ -168,6 +181,7 @@ Tensor *tensor_init(int64_t *shape, int ndim) {
   if (!t->data || !t->grad) {
     ERROR("tensor_init: malloc failed");
     free(t->shape);
+    free(t->strides);
     free(t->data);
     free(t->grad);
     free(t);
@@ -184,6 +198,30 @@ Tensor *tensor_init(int64_t *shape, int ndim) {
   t->parents[1] = NULL;
   t->backward = NULL;
   return t;
+}
+
+float tensor_get(Tensor *t, int64_t *indices) {
+  if (!t || !indices) {
+    ERROR("get: invalid param");
+    return 0.0f;
+  }
+  int64_t idx = 0;
+  for (int i = 0; i < t->ndim; i++) {
+    idx += indices[i] * t->strides[i];
+  }
+  return t->data[idx];
+}
+
+void tensor_free(Tensor *t) {
+  if (!t) {
+    ERROR("tensor_free: tensor is NULL");
+    return;
+  }
+  free(t->shape);
+  free(t->strides);
+  free(t->data);
+  free(t->grad);
+  free(t);
 }
 
 Tensor *tensor_zeros(int64_t *shape, int ndim) {
