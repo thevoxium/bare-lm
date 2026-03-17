@@ -3,3 +3,5 @@ todo.md
 main.c
 .ignore
 gpt2.c
+.DS_Store
+
