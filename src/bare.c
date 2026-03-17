@@ -780,3 +780,152 @@ Tensor *max_t(Tensor *a, int dim) {
   out->backward = backward_max;
   return out;
 }
+
+static void backward_relu(Tensor *self) {
+  Tensor *a = self->parents[0];
+  for (int i = 0; i < self->numel; i++) {
+    if (a)
+      a->grad[i] += self->grad[i] * (a->data[i] > 0.0f ? 1.0f : 0.0f);
+  }
+}
+
+Tensor *relu_t(Tensor *a) {
+  if (!a) {
+    ERROR("relu_t: param is invalid");
+    return NULL;
+  }
+
+  Tensor *r = tensor_init(a->shape, a->ndim);
+  if (!r) {
+    ERROR("relu_t: tensor_init failed");
+    return NULL;
+  }
+
+  for (int i = 0; i < r->numel; i++) {
+    r->data[i] = a->data[i] > 0.0f ? a->data[i] : 0.0f;
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = RELU;
+  r->backward = backward_relu;
+
+  return r;
+}
+
+static void backward_gelu(Tensor *self) {
+  Tensor *a = self->parents[0];
+  static const float SQRT_2_OVER_PI = 0.7978845608028654f;
+  static const float COEFF = 0.044715f;
+
+  for (int i = 0; i < self->numel; i++) {
+    if (a) {
+      float x = a->data[i];
+      float x3 = x * x * x;
+      float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
+      float tanh_inner = tanhf(inner);
+      float sech2 = 1.0f - tanh_inner * tanh_inner;
+      float d_inner = SQRT_2_OVER_PI * (1.0f + 3.0f * COEFF * x * x);
+      float grad = 0.5f * (1.0f + tanh_inner) + 0.5f * x * sech2 * d_inner;
+      a->grad[i] += self->grad[i] * grad;
+    }
+  }
+}
+
+Tensor *gelu_t(Tensor *a) {
+  if (!a) {
+    ERROR("gelu_t: param is invalid");
+    return NULL;
+  }
+
+  Tensor *r = tensor_init(a->shape, a->ndim);
+  if (!r) {
+    ERROR("gelu_t: tensor_init failed");
+    return NULL;
+  }
+
+  static const float SQRT_2_OVER_PI = 0.7978845608028654f;
+  static const float COEFF = 0.044715f;
+
+  for (int i = 0; i < r->numel; i++) {
+    float x = a->data[i];
+    float x3 = x * x * x;
+    float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
+    r->data[i] = 0.5f * x * (1.0f + tanhf(inner));
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = GELU;
+  r->backward = backward_gelu;
+
+  return r;
+}
+
+static void backward_sigmoid(Tensor *self) {
+  Tensor *a = self->parents[0];
+  for (int i = 0; i < self->numel; i++) {
+    if (a) {
+      float sig = self->data[i];
+      a->grad[i] += self->grad[i] * sig * (1.0f - sig);
+    }
+  }
+}
+
+Tensor *sigmoid_t(Tensor *a) {
+  if (!a) {
+    ERROR("sigmoid_t: param is invalid");
+    return NULL;
+  }
+
+  Tensor *r = tensor_init(a->shape, a->ndim);
+  if (!r) {
+    ERROR("sigmoid_t: tensor_init failed");
+    return NULL;
+  }
+
+  for (int i = 0; i < r->numel; i++) {
+    r->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = SIGMOID;
+  r->backward = backward_sigmoid;
+
+  return r;
+}
+
+static void backward_tanh(Tensor *self) {
+  Tensor *a = self->parents[0];
+  for (int i = 0; i < self->numel; i++) {
+    if (a) {
+      float th = self->data[i];
+      a->grad[i] += self->grad[i] * (1.0f - th * th);
+    }
+  }
+}
+
+Tensor *tanh_t(Tensor *a) {
+  if (!a) {
+    ERROR("tanh_t: param is invalid");
+    return NULL;
+  }
+
+  Tensor *r = tensor_init(a->shape, a->ndim);
+  if (!r) {
+    ERROR("tanh_t: tensor_init failed");
+    return NULL;
+  }
+
+  for (int i = 0; i < r->numel; i++) {
+    r->data[i] = tanhf(a->data[i]);
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = TANH;
+  r->backward = backward_tanh;
+
+  return r;
+}
