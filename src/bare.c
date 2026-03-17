@@ -1044,3 +1044,38 @@ Tensor *matmul_t(Tensor *a, Tensor *b) {
   r->backward = backward_matmul;
   return r;
 }
+
+void backward_transpose(Tensor *self) {
+  Tensor *a = self->parents[0];
+
+  int n = self->shape[0];
+  int m = self->shape[1];
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < m; j++) {
+      // a[j][i] += self.grad[i][j]
+      a->grad[j * a->shape[1] + i] += self->grad[i * m + j];
+    }
+  }
+}
+
+Tensor *transpose_t(Tensor *a) {
+  if (!a || a->ndim != 2) {
+    ERROR("transpose_t: invalid param");
+    return NULL;
+  }
+  int64_t result_shape[] = {a->shape[1], a->shape[0]};
+  Tensor *r = tensor_zeros(result_shape, 2);
+
+  for (int i = 0; i < result_shape[0]; i++) {
+    for (int j = 0; j < result_shape[1]; j++) {
+      r->data[i * result_shape[1] + j] = a->data[j * result_shape[0] + i];
+    }
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->backward = backward_transpose;
+  r->op = TRANSPOSE;
+  return r;
+}
