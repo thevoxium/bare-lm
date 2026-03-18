@@ -1136,7 +1136,7 @@ Tensor *squeeze_t(Tensor *a, int dim) {
   int64_t result_shape[a->ndim - 1];
   for (int i = 0, j = 0; i < a->ndim; i++) {
     if (i != dim) {
-      result_shape[i] = a->shape[j++];
+      result_shape[j++] = a->shape[i];
     }
   }
 
