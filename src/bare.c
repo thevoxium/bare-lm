@@ -1121,3 +1121,42 @@ Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim) {
   r->backward = backward_reshape;
   return r;
 }
+
+Tensor *squeeze_t(Tensor *a, int dim) {
+  if (!a || dim >= a->ndim || dim < 0) {
+    ERROR("squeeze_t: invalid params");
+    return NULL;
+  }
+
+  if (a->shape[dim] != 1) {
+    ERROR("squeeze_t: dim != 1");
+    return NULL;
+  }
+
+  int64_t result_shape[a->ndim - 1];
+  for (int i = 0, j = 0; i < a->ndim; i++) {
+    if (i != dim) {
+      result_shape[i] = a->shape[j++];
+    }
+  }
+
+  return reshape_t(a, result_shape, a->ndim - 1);
+}
+
+Tensor *unsqueeze_t(Tensor *a, int dim) {
+  if (!a || dim > a->ndim || dim < 0) {
+    ERROR("unsqueeze_t: invalid params");
+    return NULL;
+  }
+
+  int64_t result_shape[a->ndim + 1];
+  for (int i = 0, j = 0; i < a->ndim + 1; i++) {
+    if (i == dim) {
+      result_shape[i] = 1;
+    } else {
+      result_shape[i] = a->shape[j++];
+    }
+  }
+
+  return reshape_t(a, result_shape, a->ndim + 1);
+}

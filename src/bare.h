@@ -73,5 +73,7 @@ Tensor *mseloss_t(Tensor *a, Tensor *b);
 Tensor *matmul_t(Tensor *a, Tensor *b);
 Tensor *transpose_t(Tensor *a);
 Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim);
+Tensor *squeeze_t(Tensor *a, int dim);
+Tensor *unsqueeze_t(Tensor *a, int dim);
 
 #endif // !BARE_H
