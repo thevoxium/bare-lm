@@ -56,6 +56,15 @@ void print_t(Tensor *t, uint8_t grad) {
 static void build_topo(Tensor *root, Tensor ***result, int *result_count,
                        int *result_capacity, Tensor ***visited,
                        int *visited_count, int *visited_capacity) {
+  if (!root) {
+    return;
+  }
+
+  for (int i = 0; i < *visited_count; i++) {
+    if ((*visited)[i] == root) {
+      return;
+    }
+  }
 
   if (*result_count >= *result_capacity) {
     *result_capacity *= 2;
@@ -72,15 +81,9 @@ static void build_topo(Tensor *root, Tensor ***result, int *result_count,
     *visited_capacity *= 2;
     Tensor **tmp = realloc(*visited, sizeof(Tensor *) * (*visited_capacity));
     if (tmp) {
-      *result = tmp;
+      *visited = tmp;
     } else {
       ERROR("build_topo: realloc failed");
-      return;
-    }
-  }
-
-  for (int i = 0; i < *visited_count; i++) {
-    if ((*visited)[i] == root) {
       return;
     }
   }
@@ -105,7 +108,7 @@ void backward(Tensor *root) {
 
   int result_count = 0;
   int result_capacity = 16;
-  Tensor **result = malloc(sizeof(Tensor *) * result_capacity);
+  Tensor **result = calloc(result_capacity, sizeof(Tensor *));
   if (!result) {
     ERROR("backward: result malloc failed");
     return;
@@ -113,7 +116,7 @@ void backward(Tensor *root) {
 
   int visited_count = 0;
   int visited_capacity = 16;
-  Tensor **visited = malloc(sizeof(Tensor *) * visited_capacity);
+  Tensor **visited = calloc(visited_capacity, sizeof(Tensor *));
   if (!visited) {
     free(result);
     ERROR("backward: visited malloc failed");
@@ -128,6 +131,10 @@ void backward(Tensor *root) {
   }
 
   for (int i = result_count - 1; i >= 0; i--) {
+    if (!result[i]) {
+      printf("bad topo node\n");
+      continue;
+    }
     if (result[i]->backward) {
       result[i]->backward(result[i]);
     }
@@ -1343,7 +1350,7 @@ Tensor *crossentropyloss_t(Tensor *a, Tensor *b) {
   result->data[0] = loss;
   result->op = CROSSENTROPY;
   result->parents[0] = a;
-  result->parents[1] = NULL;
+  result->parents[1] = b;
   result->backward = backward_crossentropy;
   return result;
 }
