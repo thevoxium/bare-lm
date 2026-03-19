@@ -3,6 +3,51 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+dt_array *dt_array_create() {
+  dt_array *a = (dt_array *)malloc(sizeof(dt_array));
+  if (!a) {
+    ERROR("dt_array_create: array creation failed");
+    return NULL;
+  }
+
+  a->count = 0;
+  a->capacity = 16;
+  a->t = (Tensor **)malloc(a->capacity * sizeof(Tensor *));
+  if (!a->t) {
+    ERROR("dt_array_create: tensor array creation failed");
+    free(a);
+    return NULL;
+  }
+  return a;
+}
+
+void dt_array_free(dt_array *a) {
+  if (!a) {
+    ERROR("dt_array_free: NULL");
+    return;
+  }
+  free(a->t);
+  free(a);
+}
+
+void dt_array_push(dt_array *a, Tensor *t) {
+  if (!a || !t) {
+    ERROR("dt_array_push: NULL params");
+    return;
+  }
+  if (a->count >= a->capacity) {
+    a->capacity = a->capacity * 2;
+    Tensor **tmp = realloc(a->t, sizeof(Tensor *) * a->capacity);
+    if (tmp) {
+      a->t = tmp;
+    } else {
+      ERROR("dt_array_push: realloc failed");
+      return;
+    }
+  }
+  a->t[a->count++] = t;
+}
+
 static void print_data(float *data, int64_t *shape, int ndim, int dim, int *idx,
                        int indent) {
   printf("%*s[", indent, "");
@@ -53,50 +98,26 @@ void print_t(Tensor *t, uint8_t grad) {
   }
 }
 
-static void build_topo(Tensor *root, Tensor ***result, int *result_count,
-                       int *result_capacity, Tensor ***visited,
-                       int *visited_count, int *visited_capacity) {
+static void build_topo(Tensor *root, dt_array *result, dt_array *visited) {
   if (!root) {
     return;
   }
 
-  for (int i = 0; i < *visited_count; i++) {
-    if ((*visited)[i] == root) {
+  for (int i = 0; i < visited->count; i++) {
+    if (visited->t[i] == root) {
       return;
     }
   }
 
-  if (*visited_count >= *visited_capacity) {
-    *visited_capacity *= 2;
-    Tensor **tmp = realloc(*visited, sizeof(Tensor *) * (*visited_capacity));
-    if (tmp) {
-      *visited = tmp;
-    } else {
-      ERROR("build_topo: realloc failed");
-      return;
-    }
-  }
-
-  (*visited)[(*visited_count)++] = root;
+  dt_array_push(visited, root);
 
   for (int i = 0; i < 2; i++) {
     if (root->parents[i]) {
-      build_topo(root->parents[i], result, result_count, result_capacity,
-                 visited, visited_count, visited_capacity);
+      build_topo(root->parents[i], result, visited);
     }
   }
 
-  if (*result_count >= *result_capacity) {
-    *result_capacity *= 2;
-    Tensor **tmp = realloc(*result, sizeof(Tensor *) * (*result_capacity));
-    if (tmp) {
-      *result = tmp;
-    } else {
-      ERROR("build_topo: realloc failed");
-      return;
-    }
-  }
-  (*result)[(*result_count)++] = root;
+  dt_array_push(result, root);
 }
 
 void backward(Tensor *root) {
@@ -105,41 +126,35 @@ void backward(Tensor *root) {
     return;
   }
 
-  int result_count = 0;
-  int result_capacity = 16;
-  Tensor **result = calloc(result_capacity, sizeof(Tensor *));
+  dt_array *result = dt_array_create();
   if (!result) {
-    ERROR("backward: result malloc failed");
+    ERROR("backward: result failed");
     return;
   }
 
-  int visited_count = 0;
-  int visited_capacity = 16;
-  Tensor **visited = calloc(visited_capacity, sizeof(Tensor *));
+  dt_array *visited = dt_array_create();
   if (!visited) {
-    free(result);
+    dt_array_free(result);
     ERROR("backward: visited malloc failed");
     return;
   }
 
-  build_topo(root, &result, &result_count, &result_capacity, &visited,
-             &visited_count, &visited_capacity);
+  build_topo(root, result, visited);
 
   for (int i = 0; i < root->numel; i++) {
     root->grad[i] = 1.0f;
   }
 
-  for (int i = result_count - 1; i >= 0; i--) {
-    if (!result[i]) {
-      printf("bad topo node\n");
+  for (int i = result->count - 1; i >= 0; i--) {
+    if (!result->t[i]) {
       continue;
     }
-    if (result[i]->backward) {
-      result[i]->backward(result[i]);
+    if (result->t[i]->backward) {
+      result->t[i]->backward(result->t[i]);
     }
   }
-  free(result);
-  free(visited);
+  dt_array_free(result);
+  dt_array_free(visited);
 }
 
 Tensor *tensor_init(int64_t *shape, int ndim) {

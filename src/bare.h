@@ -46,6 +46,16 @@ typedef struct Tensor {
   float op_params[2];
 } Tensor;
 
+typedef struct dt_array {
+  Tensor **t;
+  int count;
+  int capacity;
+} dt_array;
+
+dt_array *dt_array_create();
+void dt_array_free(dt_array *a);
+void dt_array_push(dt_array *a, Tensor *t);
+
 void backward(Tensor *root);
 
 Tensor *tensor_init(int64_t *shape, int ndim);
