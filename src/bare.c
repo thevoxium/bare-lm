@@ -5,10 +5,7 @@
 
 Dt_array *dt_array_create() {
   Dt_array *a = (Dt_array *)malloc(sizeof(Dt_array));
-  if (!a) {
-    ERROR("dt_array_create: array creation failed");
-    return NULL;
-  }
+  CHECK(a, "dt_array_create: array creation failed");
 
   a->count = 0;
   a->capacity = 16;
@@ -32,12 +29,8 @@ void dt_array_push(Dt_array *a, Tensor *t) {
   if (a->count >= a->capacity) {
     a->capacity = a->capacity * 2;
     Tensor **tmp = realloc(a->t, sizeof(Tensor *) * a->capacity);
-    if (tmp) {
-      a->t = tmp;
-    } else {
-      ERROR("dt_array_push: realloc failed");
-      return;
-    }
+    CHECK_VOID(tmp, "dt_array_push: realloc failed");
+    a->t = tmp;
   }
   a->t[a->count++] = t;
 }
@@ -446,14 +439,10 @@ Tensor *pow_t(Tensor *a, float exponent, GraphContext *ctx) {
   CHECK(a, "pow_op: param is invalid");
 
   for (int i = 0; i < a->numel; i++) {
-    if (a->data[i] < 0.0f && exponent != (int)exponent) {
-      ERROR("pow_op: negative base with non-integer exponent");
-      return NULL;
-    }
-    if (a->data[i] == 0.0f && exponent < 0.0f) {
-      ERROR("pow_op: zero base with negative exponent");
-      return NULL;
-    }
+    CHECK(!(a->data[i] < 0.0f && exponent != (int)exponent),
+          "pow_op: negative base with non-integer exponent");
+    CHECK(!(a->data[i] == 0.0f && exponent < 0.0f),
+          "pow_op: zero base with negative exponent");
   }
 
   Tensor *r = tensor_init(a->shape, a->ndim, ctx);
@@ -537,10 +526,7 @@ static void backward_sum(Tensor *self) {
   Tensor *a = self->parents[0];
 
   int dim = find_reduced_dim(a, self);
-  if (dim < 0) {
-    ERROR("backward_sum: could not determine reduced dimension");
-    return;
-  }
+  CHECK_VOID(dim >= 0, "backward_sum: could not determine reduced dimension");
 
   int outer = 1, inner = 1;
   int reduce = a->shape[dim];
@@ -613,10 +599,8 @@ static void backward_mean(Tensor *self) {
   Tensor *a = self->parents[0];
 
   int dim = find_reduced_dim(a, self);
-  if (dim < 0) {
-    ERROR("backward_mean: could not determine reduced dimension");
-    return;
-  }
+  CHECK_VOID(dim >= 0, "backward_mean: could not determine reduced dimension");
+
   int R = a->shape[dim];
 
   int outer = 1, inner = 1;
@@ -1016,10 +1000,7 @@ Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim, GraphContext *ctx) {
   for (int i = 0; i < ndim; i++) {
     numel *= shape[i];
   }
-  if (numel != a->numel) {
-    ERROR("reshape_t: numel does not match");
-    return NULL;
-  }
+  CHECK(numel == a->numel, "reshape_t: numel does not match");
 
   Tensor *r = tensor_zeros(shape, ndim, ctx);
   CHECK(r, "reshape_t: result tensor failed");
@@ -1037,10 +1018,7 @@ Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim, GraphContext *ctx) {
 Tensor *squeeze_t(Tensor *a, int dim, GraphContext *ctx) {
   CHECK(a && dim >= 0 && dim < a->ndim, "squeeze_t: invalid params");
 
-  if (a->shape[dim] != 1) {
-    ERROR("squeeze_t: dim != 1");
-    return NULL;
-  }
+  CHECK(a->shape[dim] == 1, "squeeze_t: dim != 1");
 
   int64_t result_shape[a->ndim - 1];
   for (int i = 0, j = 0; i < a->ndim; i++) {
@@ -1128,12 +1106,8 @@ Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim, GraphContext *ctx) {
   }
 
   for (int i = 0; i < tar_dim; i++) {
-    if (align_shape[i] == 1 || align_shape[i] == shape[i]) {
-      continue;
-    } else {
-      ERROR("broadcast_t: not compatible");
-      return NULL;
-    }
+    CHECK(align_shape[i] == 1 || align_shape[i] == shape[i],
+          "broadcast_t: not compatible");
   }
 
   Tensor *r = tensor_zeros(shape, tar_dim, ctx);
