@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-dt_array *dt_array_create() {
-  dt_array *a = (dt_array *)malloc(sizeof(dt_array));
+Dt_array *dt_array_create() {
+  Dt_array *a = (Dt_array *)malloc(sizeof(Dt_array));
   if (!a) {
-    ERROR("dt_array_create: array creation failed");
+    ERROR("Dt_array_create: array creation failed");
     return NULL;
   }
 
@@ -14,25 +14,25 @@ dt_array *dt_array_create() {
   a->capacity = 16;
   a->t = (Tensor **)malloc(a->capacity * sizeof(Tensor *));
   if (!a->t) {
-    ERROR("dt_array_create: tensor array creation failed");
+    ERROR("Dt_array_create: tensor array creation failed");
     free(a);
     return NULL;
   }
   return a;
 }
 
-void dt_array_free(dt_array *a) {
+void dt_array_free(Dt_array *a) {
   if (!a) {
-    ERROR("dt_array_free: NULL");
+    ERROR("Dt_array_free: NULL");
     return;
   }
   free(a->t);
   free(a);
 }
 
-void dt_array_push(dt_array *a, Tensor *t) {
+void dt_array_push(Dt_array *a, Tensor *t) {
   if (!a || !t) {
-    ERROR("dt_array_push: NULL params");
+    ERROR("Dt_array_push: NULL params");
     return;
   }
   if (a->count >= a->capacity) {
@@ -41,7 +41,7 @@ void dt_array_push(dt_array *a, Tensor *t) {
     if (tmp) {
       a->t = tmp;
     } else {
-      ERROR("dt_array_push: realloc failed");
+      ERROR("Dt_array_push: realloc failed");
       return;
     }
   }
@@ -98,7 +98,7 @@ void print_t(Tensor *t, uint8_t grad) {
   }
 }
 
-static void build_topo(Tensor *root, dt_array *result, dt_array *visited) {
+static void build_topo(Tensor *root, Dt_array *result, Dt_array *visited) {
   if (!root) {
     return;
   }
@@ -126,13 +126,13 @@ void backward(Tensor *root) {
     return;
   }
 
-  dt_array *result = dt_array_create();
+  Dt_array *result = dt_array_create();
   if (!result) {
     ERROR("backward: result failed");
     return;
   }
 
-  dt_array *visited = dt_array_create();
+  Dt_array *visited = dt_array_create();
   if (!visited) {
     dt_array_free(result);
     ERROR("backward: visited malloc failed");

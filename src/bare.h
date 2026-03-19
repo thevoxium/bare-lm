@@ -46,15 +46,19 @@ typedef struct Tensor {
   float op_params[2];
 } Tensor;
 
-typedef struct dt_array {
+typedef struct Dt_array {
   Tensor **t;
   int count;
   int capacity;
-} dt_array;
+} Dt_array;
 
-dt_array *dt_array_create();
-void dt_array_free(dt_array *a);
-void dt_array_push(dt_array *a, Tensor *t);
+typedef struct GraphContext {
+  Dt_array dt_array;
+} GraphContext;
+
+Dt_array *Dt_array_create();
+void Dt_array_free(Dt_array *a);
+void Dt_array_push(Dt_array *a, Tensor *t);
 
 void backward(Tensor *root);
 
