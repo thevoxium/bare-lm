@@ -66,17 +66,6 @@ static void build_topo(Tensor *root, Tensor ***result, int *result_count,
     }
   }
 
-  if (*result_count >= *result_capacity) {
-    *result_capacity *= 2;
-    Tensor **tmp = realloc(*result, sizeof(Tensor *) * (*result_capacity));
-    if (tmp) {
-      *result = tmp;
-    } else {
-      ERROR("build_topo: realloc failed");
-      return;
-    }
-  }
-
   if (*visited_count >= *visited_capacity) {
     *visited_capacity *= 2;
     Tensor **tmp = realloc(*visited, sizeof(Tensor *) * (*visited_capacity));
@@ -97,6 +86,16 @@ static void build_topo(Tensor *root, Tensor ***result, int *result_count,
     }
   }
 
+  if (*result_count >= *result_capacity) {
+    *result_capacity *= 2;
+    Tensor **tmp = realloc(*result, sizeof(Tensor *) * (*result_capacity));
+    if (tmp) {
+      *result = tmp;
+    } else {
+      ERROR("build_topo: realloc failed");
+      return;
+    }
+  }
   (*result)[(*result_count)++] = root;
 }
 
