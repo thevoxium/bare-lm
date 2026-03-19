@@ -50,8 +50,8 @@ typedef enum Op {
 typedef struct Tensor {
   float *data;
   float *grad;
-  int64_t *shape;
-  int64_t *strides;
+  int *shape;
+  int *strides;
   struct Tensor *parents[2];
   int ndim;
   int numel;
@@ -80,11 +80,11 @@ void dt_array_push(Dt_array *a, Tensor *t);
 void backward(Tensor *root);
 void ctx_zero_grad(GraphContext *ctx);
 
-Tensor *tensor_init(int64_t *shape, int ndim, GraphContext *ctx);
-Tensor *tensor_zeros(int64_t *shape, int ndim, GraphContext *ctx);
-Tensor *tensor_ones(int64_t *shape, int ndim, GraphContext *ctx);
-Tensor *tensor_randn(int64_t *shape, int ndim, GraphContext *ctx);
-float tensor_get(Tensor *t, int64_t *indices);
+Tensor *tensor_init(int *shape, int ndim, GraphContext *ctx);
+Tensor *tensor_zeros(int *shape, int ndim, GraphContext *ctx);
+Tensor *tensor_ones(int *shape, int ndim, GraphContext *ctx);
+Tensor *tensor_randn(int *shape, int ndim, GraphContext *ctx);
+float tensor_get(Tensor *t, int *indices);
 void print_t(Tensor *t, uint8_t grad);
 void tensor_free(Tensor *t);
 
@@ -108,9 +108,9 @@ Tensor *mseloss_t(Tensor *a, Tensor *b, GraphContext *ctx);
 Tensor *crossentropyloss_t(Tensor *a, Tensor *b, GraphContext *ctx);
 Tensor *matmul_t(Tensor *a, Tensor *b, GraphContext *ctx);
 Tensor *transpose_t(Tensor *a, GraphContext *ctx);
-Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim, GraphContext *ctx);
+Tensor *reshape_t(Tensor *a, int *shape, int ndim, GraphContext *ctx);
 Tensor *squeeze_t(Tensor *a, int dim, GraphContext *ctx);
 Tensor *unsqueeze_t(Tensor *a, int dim, GraphContext *ctx);
-Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim, GraphContext *ctx);
+Tensor *broadcast_t(Tensor *a, int *shape, int tar_dim, GraphContext *ctx);
 
 #endif // !BARE_H
