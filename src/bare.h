@@ -6,6 +6,20 @@
 #include <stdlib.h>
 
 #define ERROR(msg) fprintf(stderr, "ERROR-> %s\n", msg)
+#define CHECK(cond, msg)                                                       \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      ERROR(msg);                                                              \
+      return NULL;                                                             \
+    }                                                                          \
+  } while (0)
+#define CHECK_VOID(cond, msg)                                                  \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      ERROR(msg);                                                              \
+      return;                                                                  \
+    }                                                                          \
+  } while (0)
 
 typedef enum Op {
   NONE,
