@@ -43,6 +43,7 @@ typedef struct Tensor {
   int numel;
   Op op;
   void (*backward)(struct Tensor *self);
+  float op_params[2];
 } Tensor;
 
 void backward(Tensor *root);

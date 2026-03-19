@@ -448,9 +448,9 @@ Tensor *neg_t(Tensor *a) {
   return r;
 }
 
-static float pow_exponent;
 static void backward_pow(Tensor *self) {
   Tensor *a = self->parents[0];
+  float pow_exponent = self->op_params[0];
   for (int i = 0; i < self->numel; i++) {
     if (a)
       a->grad[i] +=
@@ -481,8 +481,6 @@ Tensor *pow_t(Tensor *a, float exponent) {
     return NULL;
   }
 
-  pow_exponent = exponent;
-
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = powf(a->data[i], exponent);
   }
@@ -491,7 +489,7 @@ Tensor *pow_t(Tensor *a, float exponent) {
   r->parents[1] = NULL;
   r->op = POW;
   r->backward = backward_pow;
-
+  r->op_params[0] = exponent;
   return r;
 }
 
