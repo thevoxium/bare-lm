@@ -29,6 +29,7 @@ typedef enum Op {
   MATMUL,
   TRANSPOSE,
   RESHAPE,
+  BROADCAST,
 } Op;
 
 typedef struct Tensor {
@@ -75,5 +76,6 @@ Tensor *transpose_t(Tensor *a);
 Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim);
 Tensor *squeeze_t(Tensor *a, int dim);
 Tensor *unsqueeze_t(Tensor *a, int dim);
+Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim);
 
 #endif // !BARE_H

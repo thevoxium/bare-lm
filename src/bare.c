@@ -1160,3 +1160,107 @@ Tensor *unsqueeze_t(Tensor *a, int dim) {
 
   return reshape_t(a, result_shape, a->ndim + 1);
 }
+
+static void backward_broadcast(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *r = self;
+  int tar_dim = r->ndim;
+  int offset = tar_dim - a->ndim;
+
+  int64_t align_shape[tar_dim];
+  for (int i = 0; i < tar_dim; i++) {
+    align_shape[i] = 1;
+  }
+  for (int i = tar_dim - a->ndim; i < tar_dim; i++) {
+    align_shape[i] = a->shape[i - offset];
+  }
+
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int64_t mapped_idx[r->ndim];
+
+    for (int j = r->ndim - 1; j >= 0; j--) {
+      int idx = curr % r->shape[j];
+      curr = curr / r->shape[j];
+
+      if (align_shape[j] == 1) {
+        mapped_idx[j] = 0;
+      } else {
+        mapped_idx[j] = idx;
+      }
+    }
+
+    int a_idx = 0;
+    for (int k = 0; k < a->ndim; k++) {
+      a_idx += a->strides[k] * mapped_idx[k + offset];
+    }
+
+    a->grad[a_idx] += r->grad[i];
+  }
+}
+
+/*
+1. Right-align input shape with target shape by padding leading 1s.
+2. For each output index, compute its multi-dimensional index.
+3. For each dimension:
+   - If input dim == 1 → use index 0 (repeat value)
+   - Else → use the same index as output
+4. Map this to input index and copy value. Ignore the extra dim in align shape
+for getting value from a->data Output index → collapse broadcasted dims to 0 →
+read from input.
+*/
+Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim) {
+  if (!a || !shape || tar_dim < a->ndim) {
+    ERROR("broadcast_t: invalid param");
+    return NULL;
+  }
+
+  int64_t align_shape[tar_dim];
+  for (int i = 0; i < tar_dim; i++) {
+    align_shape[i] = 1;
+  }
+
+  for (int i = tar_dim - a->ndim; i < tar_dim; i++) {
+    align_shape[i] = a->shape[i - (tar_dim - a->ndim)];
+  }
+
+  for (int i = 0; i < tar_dim; i++) {
+    if (align_shape[i] == 1 || align_shape[i] == shape[i]) {
+      continue;
+    } else {
+      ERROR("broadcast_t: not compatible");
+      return NULL;
+    }
+  }
+
+  Tensor *r = tensor_zeros(shape, tar_dim);
+
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int64_t mapped_idx[r->ndim];
+
+    for (int j = r->ndim - 1; j >= 0; j--) {
+      int idx = curr % r->shape[j];
+      curr = curr / r->shape[j];
+
+      if (align_shape[j] == 1) {
+        mapped_idx[j] = 0;
+      } else {
+        mapped_idx[j] = idx;
+      }
+    }
+
+    int a_idx = 0;
+    for (int k = a->ndim - 1; k >= 0; k--) {
+      a_idx += (a->strides[k] * mapped_idx[k + (tar_dim - a->ndim)]);
+    }
+
+    r->data[i] = a->data[a_idx];
+  }
+
+  r->op = BROADCAST;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->backward = backward_broadcast;
+  return r;
+}
