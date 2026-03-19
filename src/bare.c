@@ -6,7 +6,7 @@
 Dt_array *dt_array_create() {
   Dt_array *a = (Dt_array *)malloc(sizeof(Dt_array));
   if (!a) {
-    ERROR("Dt_array_create: array creation failed");
+    ERROR("dt_array_create: array creation failed");
     return NULL;
   }
 
@@ -14,7 +14,7 @@ Dt_array *dt_array_create() {
   a->capacity = 16;
   a->t = (Tensor **)malloc(a->capacity * sizeof(Tensor *));
   if (!a->t) {
-    ERROR("Dt_array_create: tensor array creation failed");
+    ERROR("dt_array_create: tensor array creation failed");
     free(a);
     return NULL;
   }
@@ -23,7 +23,7 @@ Dt_array *dt_array_create() {
 
 void dt_array_free(Dt_array *a) {
   if (!a) {
-    ERROR("Dt_array_free: NULL");
+    ERROR("dt_array_free: NULL");
     return;
   }
   free(a->t);
@@ -32,7 +32,7 @@ void dt_array_free(Dt_array *a) {
 
 void dt_array_push(Dt_array *a, Tensor *t) {
   if (!a || !t) {
-    ERROR("Dt_array_push: NULL params");
+    ERROR("dt_array_push: NULL params");
     return;
   }
   if (a->count >= a->capacity) {
@@ -41,11 +41,41 @@ void dt_array_push(Dt_array *a, Tensor *t) {
     if (tmp) {
       a->t = tmp;
     } else {
-      ERROR("Dt_array_push: realloc failed");
+      ERROR("dt_array_push: realloc failed");
       return;
     }
   }
   a->t[a->count++] = t;
+}
+
+GraphContext *create_global_ctx() {
+  GraphContext *ctx = (GraphContext *)malloc(sizeof(GraphContext));
+  if (!ctx) {
+    ERROR("create_global_ctx: ctx creation failed");
+    return NULL;
+  }
+
+  ctx->dt_array = dt_array_create();
+  if (!ctx->dt_array) {
+    ERROR("create_global_ctx: ctx dt array creation failed");
+    free(ctx);
+    return NULL;
+  }
+
+  return ctx;
+}
+
+void ctx_free(GraphContext *ctx) {
+  if (!ctx) {
+    ERROR("ctx_free: NULL");
+    return;
+  }
+
+  for (int i = 0; i < ctx->dt_array->count; i++) {
+    tensor_free(ctx->dt_array->t[i]);
+  }
+  dt_array_free(ctx->dt_array);
+  free(ctx);
 }
 
 static void print_data(float *data, int64_t *shape, int ndim, int dim, int *idx,
@@ -157,7 +187,7 @@ void backward(Tensor *root) {
   dt_array_free(visited);
 }
 
-Tensor *tensor_init(int64_t *shape, int ndim) {
+Tensor *tensor_init(int64_t *shape, int ndim, GraphContext *ctx) {
   if (!shape || ndim <= 0) {
     ERROR("tensor_init: param is invalid");
     return NULL;
@@ -218,6 +248,11 @@ Tensor *tensor_init(int64_t *shape, int ndim) {
   t->parents[0] = NULL;
   t->parents[1] = NULL;
   t->backward = NULL;
+
+  if (ctx) {
+    dt_array_push(ctx->dt_array, t);
+  }
+
   return t;
 }
 
@@ -245,8 +280,8 @@ void tensor_free(Tensor *t) {
   free(t);
 }
 
-Tensor *tensor_zeros(int64_t *shape, int ndim) {
-  Tensor *t = tensor_init(shape, ndim);
+Tensor *tensor_zeros(int64_t *shape, int ndim, GraphContext *ctx) {
+  Tensor *t = tensor_init(shape, ndim, ctx);
   if (!t) {
     ERROR("tensor_zeros: tensor_init failed");
     return NULL;
@@ -254,8 +289,8 @@ Tensor *tensor_zeros(int64_t *shape, int ndim) {
   return t;
 }
 
-Tensor *tensor_ones(int64_t *shape, int ndim) {
-  Tensor *t = tensor_init(shape, ndim);
+Tensor *tensor_ones(int64_t *shape, int ndim, GraphContext *ctx) {
+  Tensor *t = tensor_init(shape, ndim, ctx);
   if (!t) {
     ERROR("tensor_ones: tensor_init failed");
     return NULL;
@@ -266,8 +301,8 @@ Tensor *tensor_ones(int64_t *shape, int ndim) {
   return t;
 }
 
-Tensor *tensor_randn(int64_t *shape, int ndim) {
-  Tensor *t = tensor_init(shape, ndim);
+Tensor *tensor_randn(int64_t *shape, int ndim, GraphContext *ctx) {
+  Tensor *t = tensor_init(shape, ndim, ctx);
   if (!t) {
     ERROR("tensor_randn: tensor_init failed");
     return NULL;
@@ -302,13 +337,13 @@ static void backward_add(Tensor *self) {
   }
 }
 
-Tensor *add_t(Tensor *a, Tensor *b) {
+Tensor *add_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->numel != b->numel) {
     ERROR("add: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("add: tensor_init failed");
     return NULL;
@@ -337,13 +372,13 @@ static void backward_sub(Tensor *self) {
   }
 }
 
-Tensor *sub_t(Tensor *a, Tensor *b) {
+Tensor *sub_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->numel != b->numel) {
     ERROR("sub: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("sub: tensor_init failed");
     return NULL;
@@ -372,13 +407,13 @@ static void backward_mul(Tensor *self) {
   }
 }
 
-Tensor *mul_t(Tensor *a, Tensor *b) {
+Tensor *mul_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->numel != b->numel) {
     ERROR("mul: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("mul: tensor_init failed");
     return NULL;
@@ -407,13 +442,13 @@ static void backward_div(Tensor *self) {
   }
 }
 
-Tensor *divi_t(Tensor *a, Tensor *b) {
+Tensor *divi_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->numel != b->numel) {
     ERROR("div_op: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("div_op: tensor_init failed");
     return NULL;
@@ -439,13 +474,13 @@ static void backward_neg(Tensor *self) {
   }
 }
 
-Tensor *neg_t(Tensor *a) {
+Tensor *neg_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("neg: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("neg: tensor_init failed");
     return NULL;
@@ -473,7 +508,7 @@ static void backward_pow(Tensor *self) {
   }
 }
 
-Tensor *pow_t(Tensor *a, float exponent) {
+Tensor *pow_t(Tensor *a, float exponent, GraphContext *ctx) {
   if (!a) {
     ERROR("pow_op: param is invalid");
     return NULL;
@@ -490,7 +525,7 @@ Tensor *pow_t(Tensor *a, float exponent) {
     }
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("pow_op: tensor_init failed");
     return NULL;
@@ -516,13 +551,13 @@ static void backward_exp(Tensor *self) {
   }
 }
 
-Tensor *exp_t(Tensor *a) {
+Tensor *exp_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("exp_op: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("exp_op: tensor_init failed");
     return NULL;
@@ -548,13 +583,13 @@ static void backward_log(Tensor *self) {
   }
 }
 
-Tensor *log_t(Tensor *a) {
+Tensor *log_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("log_op: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("log_op: tensor_init failed");
     return NULL;
@@ -612,7 +647,7 @@ static void backward_sum(Tensor *self) {
   }
 }
 
-Tensor *sum_t(Tensor *a, int dim) {
+Tensor *sum_t(Tensor *a, int dim, GraphContext *ctx) {
   if (!a || dim >= a->ndim || dim < 0) {
     ERROR("sum_t: param invalid");
     return NULL;
@@ -634,7 +669,7 @@ Tensor *sum_t(Tensor *a, int dim) {
     out_ndim = a->ndim - 1;
   }
 
-  Tensor *out = tensor_init(shape, out_ndim);
+  Tensor *out = tensor_init(shape, out_ndim, ctx);
   if (!out) {
     ERROR("sum_t: out failed");
     return NULL;
@@ -694,8 +729,8 @@ static void backward_mean(Tensor *self) {
     }
   }
 }
-Tensor *mean_t(Tensor *a, int dim) {
-  Tensor *r = sum_t(a, dim);
+Tensor *mean_t(Tensor *a, int dim, GraphContext *ctx) {
+  Tensor *r = sum_t(a, dim, ctx);
   if (!r) {
     ERROR("mean_t: sum_t failed");
     return NULL;
@@ -720,7 +755,7 @@ static void backward_dot(Tensor *self) {
   }
 }
 
-Tensor *dot_t(Tensor *a, Tensor *b) {
+Tensor *dot_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->ndim != b->ndim || a->ndim != 1 ||
       a->shape[0] != b->shape[0]) {
     ERROR("dot_t: invalid param");
@@ -728,7 +763,7 @@ Tensor *dot_t(Tensor *a, Tensor *b) {
   }
 
   int64_t shape[] = {1};
-  Tensor *r = tensor_zeros(shape, 1);
+  Tensor *r = tensor_zeros(shape, 1, ctx);
   for (int i = 0; i < a->numel; i++) {
     r->data[0] += (a->data[i] * b->data[i]);
   }
@@ -775,7 +810,7 @@ static void backward_max(Tensor *self) {
   }
 }
 
-Tensor *max_t(Tensor *a, int dim) {
+Tensor *max_t(Tensor *a, int dim, GraphContext *ctx) {
   if (!a || dim >= a->ndim || dim < 0) {
     ERROR("max_t: param invalid");
     return NULL;
@@ -796,7 +831,7 @@ Tensor *max_t(Tensor *a, int dim) {
     out_ndim = a->ndim - 1;
   }
 
-  Tensor *out = tensor_init(shape, out_ndim);
+  Tensor *out = tensor_init(shape, out_ndim, ctx);
   if (!out) {
     ERROR("max_t: out failed");
     return NULL;
@@ -833,13 +868,13 @@ static void backward_relu(Tensor *self) {
   }
 }
 
-Tensor *relu_t(Tensor *a) {
+Tensor *relu_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("relu_t: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("relu_t: tensor_init failed");
     return NULL;
@@ -876,13 +911,13 @@ static void backward_gelu(Tensor *self) {
   }
 }
 
-Tensor *gelu_t(Tensor *a) {
+Tensor *gelu_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("gelu_t: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("gelu_t: tensor_init failed");
     return NULL;
@@ -916,13 +951,13 @@ static void backward_sigmoid(Tensor *self) {
   }
 }
 
-Tensor *sigmoid_t(Tensor *a) {
+Tensor *sigmoid_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("sigmoid_t: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("sigmoid_t: tensor_init failed");
     return NULL;
@@ -950,13 +985,13 @@ static void backward_tanh(Tensor *self) {
   }
 }
 
-Tensor *tanh_t(Tensor *a) {
+Tensor *tanh_t(Tensor *a, GraphContext *ctx) {
   if (!a) {
     ERROR("tanh_t: param is invalid");
     return NULL;
   }
 
-  Tensor *r = tensor_init(a->shape, a->ndim);
+  Tensor *r = tensor_init(a->shape, a->ndim, ctx);
   if (!r) {
     ERROR("tanh_t: tensor_init failed");
     return NULL;
@@ -988,14 +1023,14 @@ static void backward_mse(Tensor *self) {
   }
 }
 
-Tensor *mseloss_t(Tensor *a, Tensor *b) {
+Tensor *mseloss_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->numel != b->numel) {
     ERROR("mseloss_t: invalid params");
     return NULL;
   }
 
   int64_t shape[] = {1};
-  Tensor *r = tensor_zeros(shape, 1);
+  Tensor *r = tensor_zeros(shape, 1, ctx);
   for (int i = 0; i < a->numel; i++) {
     r->data[0] += ((a->data[i] - b->data[i]) * (a->data[i] - b->data[i]));
   }
@@ -1038,14 +1073,14 @@ static void backward_matmul(Tensor *self) {
   }
 }
 
-Tensor *matmul_t(Tensor *a, Tensor *b) {
+Tensor *matmul_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->ndim != b->ndim || a->ndim != 2 ||
       a->shape[1] != b->shape[0]) {
     ERROR("matmul_t: invalid param");
     return NULL;
   }
   int64_t result_shape[] = {a->shape[0], b->shape[1]};
-  Tensor *r = tensor_zeros(result_shape, 2);
+  Tensor *r = tensor_zeros(result_shape, 2, ctx);
 
   for (int i = 0; i < a->shape[0]; i++) {
     for (int j = 0; j < b->shape[1]; j++) {
@@ -1078,13 +1113,13 @@ void backward_transpose(Tensor *self) {
   }
 }
 
-Tensor *transpose_t(Tensor *a) {
+Tensor *transpose_t(Tensor *a, GraphContext *ctx) {
   if (!a || a->ndim != 2) {
     ERROR("transpose_t: invalid param");
     return NULL;
   }
   int64_t result_shape[] = {a->shape[1], a->shape[0]};
-  Tensor *r = tensor_zeros(result_shape, 2);
+  Tensor *r = tensor_zeros(result_shape, 2, ctx);
   if (!r) {
     ERROR("transpose_t: result tensor failed");
     return NULL;
@@ -1110,7 +1145,7 @@ static void backward_reshape(Tensor *self) {
   }
 }
 
-Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim) {
+Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim, GraphContext *ctx) {
   if (!a) {
     ERROR("reshape_t: invalid param");
     return NULL;
@@ -1125,7 +1160,7 @@ Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim) {
     return NULL;
   }
 
-  Tensor *r = tensor_zeros(shape, ndim);
+  Tensor *r = tensor_zeros(shape, ndim, ctx);
   if (!r) {
     ERROR("reshape_t: result tensor failed");
     return NULL;
@@ -1141,7 +1176,7 @@ Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim) {
   return r;
 }
 
-Tensor *squeeze_t(Tensor *a, int dim) {
+Tensor *squeeze_t(Tensor *a, int dim, GraphContext *ctx) {
   if (!a || dim >= a->ndim || dim < 0) {
     ERROR("squeeze_t: invalid params");
     return NULL;
@@ -1159,10 +1194,10 @@ Tensor *squeeze_t(Tensor *a, int dim) {
     }
   }
 
-  return reshape_t(a, result_shape, a->ndim - 1);
+  return reshape_t(a, result_shape, a->ndim - 1, ctx);
 }
 
-Tensor *unsqueeze_t(Tensor *a, int dim) {
+Tensor *unsqueeze_t(Tensor *a, int dim, GraphContext *ctx) {
   if (!a || dim > a->ndim || dim < 0) {
     ERROR("unsqueeze_t: invalid params");
     return NULL;
@@ -1177,7 +1212,7 @@ Tensor *unsqueeze_t(Tensor *a, int dim) {
     }
   }
 
-  return reshape_t(a, result_shape, a->ndim + 1);
+  return reshape_t(a, result_shape, a->ndim + 1, ctx);
 }
 
 static void backward_broadcast(Tensor *self) {
@@ -1228,7 +1263,7 @@ static void backward_broadcast(Tensor *self) {
 for getting value from a->data Output index → collapse broadcasted dims to 0 →
 read from input.
 */
-Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim) {
+Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim, GraphContext *ctx) {
   if (!a || !shape || tar_dim < a->ndim) {
     ERROR("broadcast_t: invalid param");
     return NULL;
@@ -1252,7 +1287,7 @@ Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim) {
     }
   }
 
-  Tensor *r = tensor_zeros(shape, tar_dim);
+  Tensor *r = tensor_zeros(shape, tar_dim, ctx);
 
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
@@ -1323,7 +1358,7 @@ static void backward_crossentropy(Tensor *self) {
   }
 }
 
-Tensor *crossentropyloss_t(Tensor *a, Tensor *b) {
+Tensor *crossentropyloss_t(Tensor *a, Tensor *b, GraphContext *ctx) {
   if (!a || !b || a->ndim != 2 || b->ndim != 1 || a->shape[0] != b->shape[0]) {
     ERROR("crossentropyloss_t: invalid params");
     return NULL;
@@ -1333,7 +1368,7 @@ Tensor *crossentropyloss_t(Tensor *a, Tensor *b) {
   int C = a->shape[1];
 
   int64_t shape[] = {1};
-  Tensor *result = tensor_zeros(shape, 1);
+  Tensor *result = tensor_zeros(shape, 1, ctx);
   if (!result) {
     ERROR("crossentropyloss_t: result allocation failed");
     return NULL;

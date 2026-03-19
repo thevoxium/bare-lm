@@ -53,46 +53,49 @@ typedef struct Dt_array {
 } Dt_array;
 
 typedef struct GraphContext {
-  Dt_array dt_array;
+  Dt_array *dt_array;
 } GraphContext;
 
-Dt_array *Dt_array_create();
-void Dt_array_free(Dt_array *a);
-void Dt_array_push(Dt_array *a, Tensor *t);
+GraphContext *create_global_ctx();
+void ctx_free(GraphContext *ctx);
+
+Dt_array *dt_array_create();
+void dt_array_free(Dt_array *a);
+void dt_array_push(Dt_array *a, Tensor *t);
 
 void backward(Tensor *root);
 
-Tensor *tensor_init(int64_t *shape, int ndim);
-Tensor *tensor_zeros(int64_t *shape, int ndim);
-Tensor *tensor_ones(int64_t *shape, int ndim);
-Tensor *tensor_randn(int64_t *shape, int ndim);
+Tensor *tensor_init(int64_t *shape, int ndim, GraphContext *ctx);
+Tensor *tensor_zeros(int64_t *shape, int ndim, GraphContext *ctx);
+Tensor *tensor_ones(int64_t *shape, int ndim, GraphContext *ctx);
+Tensor *tensor_randn(int64_t *shape, int ndim, GraphContext *ctx);
 float tensor_get(Tensor *t, int64_t *indices);
 void print_t(Tensor *t, uint8_t grad);
 void tensor_free(Tensor *t);
 
-Tensor *add_t(Tensor *a, Tensor *b);
-Tensor *sub_t(Tensor *a, Tensor *b);
-Tensor *mul_t(Tensor *a, Tensor *b);
-Tensor *divi_t(Tensor *a, Tensor *b);
-Tensor *neg_t(Tensor *a);
-Tensor *pow_t(Tensor *a, float exponent);
-Tensor *exp_t(Tensor *a);
-Tensor *log_t(Tensor *a);
-Tensor *sum_t(Tensor *a, int dim);
-Tensor *mean_t(Tensor *a, int dim);
-Tensor *dot_t(Tensor *a, Tensor *b);
-Tensor *max_t(Tensor *a, int dim);
-Tensor *relu_t(Tensor *a);
-Tensor *gelu_t(Tensor *a);
-Tensor *sigmoid_t(Tensor *a);
-Tensor *tanh_t(Tensor *a);
-Tensor *mseloss_t(Tensor *a, Tensor *b);
-Tensor *crossentropyloss_t(Tensor *a, Tensor *b);
-Tensor *matmul_t(Tensor *a, Tensor *b);
-Tensor *transpose_t(Tensor *a);
-Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim);
-Tensor *squeeze_t(Tensor *a, int dim);
-Tensor *unsqueeze_t(Tensor *a, int dim);
-Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim);
+Tensor *add_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *sub_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *mul_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *divi_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *neg_t(Tensor *a, GraphContext *ctx);
+Tensor *pow_t(Tensor *a, float exponent, GraphContext *ctx);
+Tensor *exp_t(Tensor *a, GraphContext *ctx);
+Tensor *log_t(Tensor *a, GraphContext *ctx);
+Tensor *sum_t(Tensor *a, int dim, GraphContext *ctx);
+Tensor *mean_t(Tensor *a, int dim, GraphContext *ctx);
+Tensor *dot_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *max_t(Tensor *a, int dim, GraphContext *ctx);
+Tensor *relu_t(Tensor *a, GraphContext *ctx);
+Tensor *gelu_t(Tensor *a, GraphContext *ctx);
+Tensor *sigmoid_t(Tensor *a, GraphContext *ctx);
+Tensor *tanh_t(Tensor *a, GraphContext *ctx);
+Tensor *mseloss_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *crossentropyloss_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *matmul_t(Tensor *a, Tensor *b, GraphContext *ctx);
+Tensor *transpose_t(Tensor *a, GraphContext *ctx);
+Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim, GraphContext *ctx);
+Tensor *squeeze_t(Tensor *a, int dim, GraphContext *ctx);
+Tensor *unsqueeze_t(Tensor *a, int dim, GraphContext *ctx);
+Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim, GraphContext *ctx);
 
 #endif // !BARE_H
