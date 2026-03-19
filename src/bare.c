@@ -1264,3 +1264,86 @@ Tensor *broadcast_t(Tensor *a, int64_t *shape, int tar_dim) {
   r->backward = backward_broadcast;
   return r;
 }
+
+static void backward_crossentropy(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *b = self->parents[1];
+
+  int N = a->shape[0];
+  int C = a->shape[1];
+
+  float upstream = self->grad[0];
+
+  for (int i = 0; i < N; i++) {
+    float max = a->data[i * C];
+    for (int j = 1; j < C; j++) {
+      float val = a->data[i * C + j];
+      if (val > max)
+        max = val;
+    }
+
+    float sum = 0.0f;
+    float exp_buf[C];
+
+    for (int j = 0; j < C; j++) {
+      float e = expf(a->data[i * C + j] - max);
+      exp_buf[j] = e;
+      sum += e;
+    }
+
+    for (int j = 0; j < C; j++) {
+      float p = exp_buf[j] / sum;
+      float grad = p;
+
+      if (j == (int)b->data[i]) {
+        grad -= 1.0f;
+      }
+      grad = (grad / N) * upstream;
+      a->grad[i * C + j] += grad;
+    }
+  }
+}
+
+Tensor *crossentropyloss_t(Tensor *a, Tensor *b) {
+  if (!a || !b || a->ndim != 2 || b->ndim != 1 || a->shape[0] != b->shape[0]) {
+    ERROR("crossentropyloss_t: invalid params");
+    return NULL;
+  }
+
+  int N = a->shape[0];
+  int C = a->shape[1];
+
+  int64_t shape[] = {1};
+  Tensor *result = tensor_zeros(shape, 1);
+  if (!result) {
+    ERROR("crossentropyloss_t: result allocation failed");
+    return NULL;
+  }
+
+  float loss = 0.0f;
+
+  for (int i = 0; i < N; i++) {
+    float max = a->data[i * C];
+    for (int j = 1; j < C; j++) {
+      float val = a->data[i * C + j];
+      if (val > max)
+        max = val;
+    }
+
+    float sum = 0.0f;
+    for (int j = 0; j < C; j++) {
+      sum += expf(a->data[i * C + j] - max);
+    }
+    float log_sum_exp = max + logf(sum);
+    int target = (int)b->data[i];
+    loss += -a->data[i * C + target] + log_sum_exp;
+  }
+
+  loss /= N;
+  result->data[0] = loss;
+  result->op = CROSSENTROPY;
+  result->parents[0] = a;
+  result->parents[1] = NULL;
+  result->backward = backward_crossentropy;
+  return result;
+}

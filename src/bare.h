@@ -30,6 +30,7 @@ typedef enum Op {
   TRANSPOSE,
   RESHAPE,
   BROADCAST,
+  CROSSENTROPY,
 } Op;
 
 typedef struct Tensor {
@@ -71,6 +72,7 @@ Tensor *gelu_t(Tensor *a);
 Tensor *sigmoid_t(Tensor *a);
 Tensor *tanh_t(Tensor *a);
 Tensor *mseloss_t(Tensor *a, Tensor *b);
+Tensor *crossentropyloss_t(Tensor *a, Tensor *b);
 Tensor *matmul_t(Tensor *a, Tensor *b);
 Tensor *transpose_t(Tensor *a);
 Tensor *reshape_t(Tensor *a, int64_t *shape, int ndim);
