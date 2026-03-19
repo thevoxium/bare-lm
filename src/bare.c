@@ -162,6 +162,17 @@ void backward(Tensor *root) {
   dt_array_free(visited);
 }
 
+void ctx_zero_grad(GraphContext *ctx) {
+  CHECK_VOID(ctx, "ctx_zero_grad: NULL");
+
+  for (int i = 0; i < ctx->dt_array->count; i++) {
+    Tensor *t = ctx->dt_array->t[i];
+    for (int j = 0; j < t->numel; j++) {
+      t->grad[j] = 0.0f;
+    }
+  }
+}
+
 Tensor *tensor_init(int64_t *shape, int ndim, GraphContext *ctx) {
   CHECK(shape && ndim > 0, "tensor_init: param is invalid");
 

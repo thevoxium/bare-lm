@@ -78,6 +78,7 @@ void dt_array_free(Dt_array *a);
 void dt_array_push(Dt_array *a, Tensor *t);
 
 void backward(Tensor *root);
+void ctx_zero_grad(GraphContext *ctx);
 
 Tensor *tensor_init(int64_t *shape, int ndim, GraphContext *ctx);
 Tensor *tensor_zeros(int64_t *shape, int ndim, GraphContext *ctx);
