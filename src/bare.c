@@ -1192,3 +1192,40 @@ Tensor *crossentropyloss_t(Tensor *a, Tensor *b) {
   result->backward = backward_crossentropy;
   return result;
 }
+
+Linear *create_linear(int d_in, int d_out) {
+  CHECK(d_out > 0 && d_in > 0, "create_linear: invalid params");
+  Linear *l = (Linear *)malloc(sizeof(Linear));
+  CHECK(l, "create_linear: error in creating linear allocation");
+
+  int weight_shape[] = {d_out, d_in};
+  int bias_shape[] = {d_out};
+  l->weights = tensor_randn(weight_shape, 2);
+  CHECK(l->weights, "create_linear: weights NULL");
+
+  l->bias = tensor_randn(bias_shape, 1);
+  CHECK(l->bias, "create_linear: bias NULL");
+
+  return l;
+}
+
+Tensor *linear_t(Linear *l, Tensor *x) {
+  CHECK(x, "linear_t: x is NULL");
+
+  Tensor *W = l->weights;
+  Tensor *b = l->bias;
+  Tensor *wT = transpose_t(W);
+
+  int shape[] = {x->shape[0], l->weights->shape[0]};
+
+  b = broadcast_t(b, shape, 2);
+  Tensor *out = matmul_t(x, wT);
+  out = add_t(out, b);
+  return out;
+}
+
+void linear_free(Linear *l) {
+  CHECK_VOID(l, "linear_free: l in NULL");
+  tensor_free(l->weights);
+  tensor_free(l->bias);
+}

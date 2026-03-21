@@ -70,6 +70,15 @@ Dt_array *dt_array_create();
 void dt_array_free(Dt_array *a);
 void dt_array_push(Dt_array *a, Tensor *t);
 
+typedef struct Linear {
+  Tensor *weights;
+  Tensor *bias;
+} Linear;
+
+Linear *create_linear(int d_in, int d_out);
+Tensor *linear_t(Linear *l, Tensor *x);
+void linear_free(Linear *l);
+
 void backward(Tensor *root);
 
 Tensor *tensor_init(int *shape, int ndim);
