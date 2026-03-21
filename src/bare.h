@@ -26,22 +26,6 @@
 #define PERM 1
 #define TEMP 0
 
-typedef struct Arena {
-  uint8_t *buffer;
-  size_t size;
-  size_t used;
-} Arena;
-
-typedef struct Memory {
-  Arena *perm;
-  Arena *temp;
-} Memory;
-
-Memory *create_global_mem(size_t size);
-void reset_temp_mem(Memory *mem);
-void *allocate_mem(Memory *mem, size_t size, uint8_t perm);
-void free_global_mem(Memory *mem);
-
 typedef enum Op {
   NONE,
   ADD,
@@ -68,6 +52,17 @@ typedef enum Op {
   CROSSENTROPY,
 } Op;
 
+typedef struct Arena {
+  uint8_t *buffer;
+  size_t size;
+  size_t used;
+} Arena;
+
+typedef struct Memory {
+  Arena *perm;
+  Arena *temp;
+} Memory;
+
 typedef struct Tensor {
   float *data;
   float *grad;
@@ -87,17 +82,23 @@ typedef struct Dt_array {
   int capacity;
 } Dt_array;
 
-Dt_array *dt_array_create(Memory *mem, uint8_t perm);
-void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm);
-
 typedef Dt_array ParameterList;
-ParameterList *create_param_list(Memory *mem);
-void param_list_add(Memory *mem, ParameterList *pl, Tensor *t);
 
 typedef struct Linear {
   Tensor *weights;
   Tensor *bias;
 } Linear;
+
+Memory *create_global_mem(size_t size);
+void reset_temp_mem(Memory *mem);
+void *allocate_mem(Memory *mem, size_t size, uint8_t perm);
+void free_global_mem(Memory *mem);
+
+Dt_array *dt_array_create(Memory *mem, uint8_t perm);
+void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm);
+
+ParameterList *create_param_list(Memory *mem);
+void param_list_add(Memory *mem, ParameterList *pl, Tensor *t);
 
 Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out);
 Tensor *linear_t(Memory *mem, Linear *l, Tensor *x);
