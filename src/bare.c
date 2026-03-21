@@ -251,8 +251,6 @@ float tensor_get(Tensor *t, int *indices) {
   return t->data[idx];
 }
 
-void tensor_free(Tensor *t) { (void)t; }
-
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm) {
   Tensor *t = tensor_init(mem, shape, ndim, perm);
   CHECK(t, "tensor_zeros: tensor_init failed");
@@ -388,11 +386,11 @@ static void backward_div(Tensor *self) {
   }
 }
 
-Tensor *divi_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "div_op: param is invalid");
+Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
+  CHECK(a && b && a->numel == b->numel, "divide_t: param is invalid");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "div_op: tensor_init failed");
+  CHECK(r, "divide_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = a->data[i] / b->data[i];
@@ -960,7 +958,7 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   return r;
 }
 
-void backward_transpose(Tensor *self) {
+static void backward_transpose(Tensor *self) {
   Tensor *a = self->parents[0];
 
   int n = self->shape[0];

@@ -110,13 +110,12 @@ Tensor *tensor_ones(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm);
 float tensor_get(Tensor *t, int *indices);
 void print_t(Tensor *t, uint8_t grad);
-void tensor_free(Tensor *t);
 void zero_grad(ParameterList *pl);
 
 Tensor *add_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b);
-Tensor *divi_t(Memory *mem, Tensor *a, Tensor *b);
+Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *neg_t(Memory *mem, Tensor *a);
 Tensor *pow_t(Memory *mem, Tensor *a, float exponent);
 Tensor *exp_t(Memory *mem, Tensor *a);
