@@ -53,23 +53,23 @@ void free_global_mem(Memory *mem) {
   free(mem);
 }
 
-Dt_array *dt_array_create(Memory *mem) {
+Dt_array *dt_array_create(Memory *mem, uint8_t perm) {
   CHECK(mem, "dt_array_create: mem is NULL");
-  Dt_array *a = (Dt_array *)allocate_mem(mem, sizeof(Dt_array), TEMP);
+  Dt_array *a = (Dt_array *)allocate_mem(mem, sizeof(Dt_array), perm);
   CHECK(a, "dt_array_create: array creation failed");
 
   a->count = 0;
   a->capacity = 16;
-  a->t = (Tensor **)allocate_mem(mem, a->capacity * sizeof(Tensor *), TEMP);
+  a->t = (Tensor **)allocate_mem(mem, a->capacity * sizeof(Tensor *), perm);
   CHECK(a->t, "dt_array_create: tensor array creation failed");
   return a;
 }
 
-void dt_array_push(Memory *mem, Dt_array *a, Tensor *t) {
+void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm) {
   CHECK_VOID(mem && a && t, "dt_array_push: NULL params");
   if (a->count >= a->capacity) {
     a->capacity = a->capacity * 2;
-    Tensor **tmp = allocate_mem(mem, sizeof(Tensor *) * a->capacity, TEMP);
+    Tensor **tmp = allocate_mem(mem, sizeof(Tensor *) * a->capacity, perm);
     CHECK_VOID(tmp, "dt_array_push: alloc failed");
     for (int i = 0; i < a->count; i++)
       tmp[i] = a->t[i];
@@ -140,7 +140,7 @@ static void build_topo(Memory *mem, Tensor *root, Dt_array *result,
     }
   }
 
-  dt_array_push(mem, visited, root);
+  dt_array_push(mem, visited, root, TEMP);
 
   for (int i = 0; i < 2; i++) {
     if (root->parents[i]) {
@@ -148,16 +148,16 @@ static void build_topo(Memory *mem, Tensor *root, Dt_array *result,
     }
   }
 
-  dt_array_push(mem, result, root);
+  dt_array_push(mem, result, root, TEMP);
 }
 
 void backward(Memory *mem, Tensor *root) {
   CHECK_VOID(root, "backward: root is NULL");
 
-  Dt_array *result = dt_array_create(mem);
+  Dt_array *result = dt_array_create(mem, TEMP);
   CHECK_VOID(result, "backward: result failed");
 
-  Dt_array *visited = dt_array_create(mem);
+  Dt_array *visited = dt_array_create(mem, TEMP);
   CHECK_VOID(visited, "backward: visited failed");
 
   build_topo(mem, root, result, visited);

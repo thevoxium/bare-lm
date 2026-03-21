@@ -87,8 +87,8 @@ typedef struct Dt_array {
   int capacity;
 } Dt_array;
 
-Dt_array *dt_array_create(Memory *mem);
-void dt_array_push(Memory *mem, Dt_array *a, Tensor *t);
+Dt_array *dt_array_create(Memory *mem, uint8_t perm);
+void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm);
 
 typedef struct Linear {
   Tensor *weights;
