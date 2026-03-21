@@ -1,6 +1,7 @@
 #ifndef BARE_H
 #define BARE_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +21,22 @@
       return;                                                                  \
     }                                                                          \
   } while (0)
+
+typedef struct Arena {
+  uint8_t *buffer;
+  size_t size;
+  size_t used;
+} Arena;
+
+typedef struct Memory {
+  Arena *perm;
+  Arena *temp;
+} Memory;
+
+Memory *create_global_mem(size_t size);
+void reset_temp_mem(Memory *mem);
+void *allocate_mem(Memory *mem, size_t size, uint8_t perm);
+void free_global_mem(Memory *mem);
 
 typedef enum Op {
   NONE,

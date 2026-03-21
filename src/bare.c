@@ -3,6 +3,59 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+Memory *create_global_mem(size_t size) {
+  Memory *mem = (Memory *)malloc(sizeof(Memory));
+  CHECK(mem, "create_global_mem: could not allocated mem");
+
+  mem->perm = (Arena *)malloc(sizeof(Arena));
+  mem->temp = (Arena *)malloc(sizeof(Arena));
+  CHECK(mem->perm && mem->temp, "create_global_mem: could not create arenas");
+
+  mem->perm->buffer = (uint8_t *)malloc(size);
+  mem->temp->buffer = (uint8_t *)malloc(size);
+  CHECK(mem->perm->buffer && mem->temp->buffer,
+        "create_global_mem: error allocating buffer");
+
+  mem->perm->size = size;
+  mem->perm->used = 0;
+  mem->temp->size = size;
+  mem->temp->used = 0;
+
+  return mem;
+}
+
+void reset_temp_mem(Memory *mem) {
+  CHECK_VOID(mem, "reset_temp_mem: error resetting mem");
+  mem->temp->used = 0;
+}
+
+void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
+  CHECK(mem && size > 0, "allocate_mem: invalid params");
+  size = (size + 7) & ~7;
+  void *ptr = NULL;
+  if (perm) {
+    CHECK(mem->perm->used + size <= mem->perm->size,
+          "allocate_mem: not enough memory");
+    ptr = mem->perm->buffer + mem->perm->used;
+    mem->perm->used += size;
+  } else {
+    CHECK(mem->temp->used + size <= mem->temp->size,
+          "allocate_mem: not enough memory");
+    ptr = mem->temp->buffer + mem->temp->used;
+    mem->temp->used += size;
+  }
+  return ptr;
+}
+
+void free_global_mem(Memory *mem) {
+  CHECK_VOID(mem, "free_global_mem: error freeing mem");
+  free(mem->perm->buffer);
+  free(mem->temp->buffer);
+  free(mem->temp);
+  free(mem->perm);
+  free(mem);
+}
+
 Dt_array *dt_array_create() {
   Dt_array *a = (Dt_array *)malloc(sizeof(Dt_array));
   CHECK(a, "dt_array_create: array creation failed");
