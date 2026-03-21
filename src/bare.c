@@ -1,4 +1,5 @@
 #include "bare.h"
+#include <string.h>
 
 Memory *create_global_mem(size_t size) {
   Memory *mem = (Memory *)malloc(sizeof(Memory));
@@ -51,6 +52,24 @@ void free_global_mem(Memory *mem) {
   free(mem->temp);
   free(mem->perm);
   free(mem);
+}
+
+ParameterList *create_param_list(Memory *mem) {
+  CHECK(mem, "create_parameter_list: mem is NULL");
+  return dt_array_create(mem, PERM);
+}
+
+void param_list_add(Memory *mem, ParameterList *pl, Tensor *t) {
+  CHECK_VOID(pl && t, "param_list_add: invalid params");
+  return dt_array_push(mem, pl, t, PERM);
+}
+
+void zero_grad(ParameterList *pl) {
+  CHECK_VOID(pl, "zero_grad: invalid params");
+  for (int i = 0; i < pl->count; i++) {
+    Tensor *t = pl->t[i];
+    memset(t->grad, 0, sizeof(float) * t->numel);
+  }
 }
 
 Dt_array *dt_array_create(Memory *mem, uint8_t perm) {
@@ -1209,44 +1228,21 @@ Tensor *crossentropyloss_t(Memory *mem, Tensor *a, Tensor *b) {
   return result;
 }
 
-Linear *create_linear(Memory *mem, int d_in, int d_out) {
+Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out) {
   CHECK(d_out > 0 && d_in > 0, "create_linear: invalid params");
   Linear *l = (Linear *)allocate_mem(mem, sizeof(Linear), PERM);
   CHECK(l, "create_linear: error in creating linear allocation");
 
   int weight_shape[] = {d_out, d_in};
   int bias_shape[] = {d_out};
-  l->weights = tensor_init(mem, weight_shape, 2, PERM);
+  l->weights = tensor_randn(mem, weight_shape, 2, PERM);
   CHECK(l->weights, "create_linear: weights NULL");
 
-  for (int i = 0; i < l->weights->numel; i += 2) {
-    float u1, u2;
-    do {
-      u1 = (float)rand() / (float)RAND_MAX;
-    } while (u1 == 0.0f);
-    u2 = (float)rand() / (float)RAND_MAX;
-    float r = sqrtf(-2.0f * logf(u1));
-    float theta = 2.0f * (float)M_PI * u2;
-    l->weights->data[i] = r * cosf(theta);
-    if (i + 1 < l->weights->numel)
-      l->weights->data[i + 1] = r * sinf(theta);
-  }
-
-  l->bias = tensor_init(mem, bias_shape, 1, PERM);
+  l->bias = tensor_randn(mem, bias_shape, 1, PERM);
   CHECK(l->bias, "create_linear: bias NULL");
 
-  for (int i = 0; i < l->bias->numel; i += 2) {
-    float u1, u2;
-    do {
-      u1 = (float)rand() / (float)RAND_MAX;
-    } while (u1 == 0.0f);
-    u2 = (float)rand() / (float)RAND_MAX;
-    float r = sqrtf(-2.0f * logf(u1));
-    float theta = 2.0f * (float)M_PI * u2;
-    l->bias->data[i] = r * cosf(theta);
-    if (i + 1 < l->bias->numel)
-      l->bias->data[i + 1] = r * sinf(theta);
-  }
+  param_list_add(mem, pl, l->weights);
+  param_list_add(mem, pl, l->bias);
 
   return l;
 }
@@ -1264,4 +1260,14 @@ Tensor *linear_t(Memory *mem, Linear *l, Tensor *x) {
   Tensor *out = matmul_t(mem, x, wT);
   out = add_t(mem, out, b);
   return out;
+}
+
+void sgd_step(ParameterList *pl, float lr) {
+  CHECK_VOID(pl, "sgd_step: pl is NULL");
+  for (int i = 0; i < pl->count; i++) {
+    Tensor *t = pl->t[i];
+    for (int j = 0; j < t->numel; j++) {
+      t->data[j] -= (lr * t->grad[j]);
+    }
+  }
 }

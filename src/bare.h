@@ -90,12 +90,16 @@ typedef struct Dt_array {
 Dt_array *dt_array_create(Memory *mem, uint8_t perm);
 void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm);
 
+typedef Dt_array ParameterList;
+ParameterList *create_param_list(Memory *mem);
+void param_list_add(Memory *mem, ParameterList *pl, Tensor *t);
+
 typedef struct Linear {
   Tensor *weights;
   Tensor *bias;
 } Linear;
 
-Linear *create_linear(Memory *mem, int d_in, int d_out);
+Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out);
 Tensor *linear_t(Memory *mem, Linear *l, Tensor *x);
 
 void backward(Memory *mem, Tensor *root);
@@ -107,6 +111,7 @@ Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm);
 float tensor_get(Tensor *t, int *indices);
 void print_t(Tensor *t, uint8_t grad);
 void tensor_free(Tensor *t);
+void zero_grad(ParameterList *pl);
 
 Tensor *add_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b);
@@ -132,5 +137,7 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim);
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *unsqueeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim);
+
+void sgd_step(ParameterList *pl, float lr);
 
 #endif // !BARE_H
