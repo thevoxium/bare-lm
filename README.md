@@ -16,22 +16,12 @@ make asan FILE=main.c       # run with address + undefined behavior sanitizer
 ```c
 #include "src/bare.h"
 
-void sgd_step(Tensor *t, float lr) {
-  for (int i = 0; i < t->numel; i++) {
-    t->data[i] -= (lr * t->grad[i]);
-    t->grad[i] = 0.0f;
-  }
-}
-
 int main() {
   Memory *mem = create_global_mem(1 << 28);
+  ParameterList *pl = create_param_list(mem);
 
   int x_shape[] = {4, 2};
   int y_shape[] = {4, 1};
-  int w1_shape[] = {2, 8};
-  int b1_shape[] = {8};
-  int w2_shape[] = {8, 1};
-  int b2_shape[] = {1};
 
   Tensor *x = tensor_init(mem, x_shape, 2, PERM);
   Tensor *y = tensor_init(mem, y_shape, 2, PERM);
@@ -41,22 +31,15 @@ int main() {
   for (int i = 0; i < 8; i++) x->data[i] = x_data[i];
   for (int i = 0; i < 4; i++) y->data[i] = y_data[i];
 
-  Tensor *w1 = tensor_randn(mem, w1_shape, 2, PERM);
-  Tensor *b1 = tensor_zeros(mem, b1_shape, 1, PERM);
-  Tensor *w2 = tensor_randn(mem, w2_shape, 2, PERM);
-  Tensor *b2 = tensor_zeros(mem, b2_shape, 1, PERM);
-
-  float lr = 0.1f;
+  Linear *l1 = create_linear(mem, pl, 2, 8);
+  Linear *l2 = create_linear(mem, pl, 8, 1);
 
   for (int epoch = 0; epoch < 500; epoch++) {
-    Tensor *h = matmul_t(mem, x, w1);
-    Tensor *b1_b = broadcast_t(mem, b1, h->shape, h->ndim);
-    h = add_t(mem, h, b1_b);
-    h = relu_t(mem, h);
+    zero_grad(pl);
 
-    Tensor *o = matmul_t(mem, h, w2);
-    Tensor *b2_b = broadcast_t(mem, b2, o->shape, o->ndim);
-    o = add_t(mem, o, b2_b);
+    Tensor *h = linear_t(mem, l1, x);
+    h = relu_t(mem, h);
+    Tensor *o = linear_t(mem, l2, h);
     o = sigmoid_t(mem, o);
 
     Tensor *loss = mseloss_t(mem, o, y);
@@ -65,11 +48,7 @@ int main() {
     if (epoch % 100 == 0)
       printf("epoch %3d  loss=%.4f\n", epoch, loss->data[0]);
 
-    sgd_step(w1, lr);
-    sgd_step(b1, lr);
-    sgd_step(w2, lr);
-    sgd_step(b2, lr);
-
+    sgd_step(pl, 0.1f);
     reset_temp_mem(mem);
   }
 
@@ -79,41 +58,53 @@ int main() {
 
 ### Walkthrough
 
-**Step 1: Create memory.** A single `Memory` object holds two arenas (permanent and temporary). `1 << 28` = 256 MB per arena.
+**Step 1: Create memory and a parameter list.** A single `Memory` object holds two arenas (permanent and temporary). `1 << 28` = 256 MB per arena. A `ParameterList` tracks all trainable tensors.
 
 ```c
 Memory *mem = create_global_mem(1 << 28);
+ParameterList *pl = create_param_list(mem);
 ```
 
-**Step 2: Allocate persistent tensors.** Inputs `x`, `y` and all weight/bias tensors live for the entire training run. Pass `PERM` so they survive `reset_temp_mem`.
+**Step 2: Allocate persistent tensors.** Inputs `x` and `y` are plain PERM tensors (not trainable). Pass `PERM` so they survive `reset_temp_mem`.
 
 ```c
 Tensor *x = tensor_init(mem, x_shape, 2, PERM);
-Tensor *w1 = tensor_randn(mem, w1_shape, 2, PERM);
+Tensor *y = tensor_init(mem, y_shape, 2, PERM);
 ```
 
-**Step 3: Forward pass.** Every operation (`matmul_t`, `add_t`, `relu_t`, `sigmoid_t`, `mseloss_t`) allocates its result from the temp arena. No `malloc` calls, no cleanup code.
+**Step 3: Create layers with auto-registration.** `create_linear` allocates weights and bias as PERM tensors and automatically adds them to the parameter list.
 
 ```c
-Tensor *h = matmul_t(mem, x, w1);
+Linear *l1 = create_linear(mem, pl, 2, 8);
+Linear *l2 = create_linear(mem, pl, 8, 1);
+// pl now contains l1->weights, l1->bias, l2->weights, l2->bias
+```
+
+**Step 4: Forward pass.** Every operation (`linear_t`, `relu_t`, `sigmoid_t`, `mseloss_t`) allocates its result from the temp arena. No `malloc` calls, no cleanup code.
+
+```c
+Tensor *h = linear_t(mem, l1, x);
 h = relu_t(mem, h);
+Tensor *o = linear_t(mem, l2, h);
+o = sigmoid_t(mem, o);
 Tensor *loss = mseloss_t(mem, o, y);
 ```
 
-**Step 4: Backward pass.** `backward` builds a topological sort of the computation graph (also temp-allocated) and propagates gradients. Intermediate tensor data is still valid at this point.
+**Step 5: Backward pass.** `backward` builds a topological sort of the computation graph (also temp-allocated) and propagates gradients. Intermediate tensor data is still valid at this point.
 
 ```c
 backward(mem, loss);
 ```
 
-**Step 5: Update weights and reset.** After gradients are consumed, `reset_temp_mem` zeroes the temp arena in O(1). All intermediate tensors from the forward pass are gone. The next epoch starts with a clean temp arena.
+**Step 6: Zero grads, update, reset.** `zero_grad` clears all parameter gradients. `sgd_step` applies SGD to all parameters in one call. After gradients are consumed, `reset_temp_mem` zeroes the temp arena in O(1). All intermediate tensors from the forward pass are gone.
 
 ```c
-sgd_step(w1, lr);
+zero_grad(pl);
+sgd_step(pl, 0.1f);
 reset_temp_mem(mem);
 ```
 
-**Step 6: Cleanup.** `free_global_mem` releases both arenas and the `Memory` struct.
+**Step 7: Cleanup.** `free_global_mem` releases both arenas and the `Memory` struct.
 
 ```c
 free_global_mem(mem);
@@ -135,6 +126,28 @@ epoch N:  forward (temp fills) → backward (reads temp) → update → reset_te
 epoch N+1: forward (temp fills from 0) → ...
 ```
 
+## ParameterList
+
+`ParameterList` is a dynamic array of trainable tensors. It is a `typedef` of `Dt_array` allocated in the PERM arena.
+
+```c
+ParameterList *pl = create_param_list(mem);
+
+// Manual registration
+param_list_add(mem, pl, my_tensor);
+
+// Or automatic — create_linear registers weights and bias for you
+Linear *l = create_linear(mem, pl, 128, 64);
+```
+
+Once built, the parameter list drives the training loop:
+
+```c
+zero_grad(pl);       // zero all parameter gradients
+backward(mem, loss); // backprop
+sgd_step(pl, 0.01f); // update all parameters
+```
+
 ## API Reference
 
 ### Memory
@@ -145,6 +158,15 @@ epoch N+1: forward (temp fills from 0) → ...
 | `reset_temp_mem` | `(Memory *mem)` | Reset temp arena to empty |
 | `allocate_mem` | `(Memory *mem, size_t size, uint8_t perm) → void*` | Arena allocation |
 | `free_global_mem` | `(Memory *mem)` | Free both arenas and Memory |
+
+### ParameterList
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `create_param_list` | `(Memory *mem) → ParameterList*` | Create an empty PERM parameter list |
+| `param_list_add` | `(Memory *mem, ParameterList *pl, Tensor *t)` | Add a tensor to the list |
+| `zero_grad` | `(ParameterList *pl)` | Zero gradients for all parameters |
+| `sgd_step` | `(ParameterList *pl, float lr)` | SGD update: `data -= lr * grad` |
 
 ### Tensor Creation
 
@@ -220,7 +242,7 @@ epoch N+1: forward (temp fills from 0) → ...
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `create_linear` | `(Memory*, int d_in, int d_out) → Linear*` | Linear layer (weights + bias, PERM) |
+| `create_linear` | `(Memory*, ParameterList *pl, int d_in, int d_out) → Linear*` | Linear layer, auto-registers weights + bias |
 | `linear_t` | `(Memory*, Linear*, Tensor *x) → Tensor*` | Forward: x @ W^T + b |
 
 ### Autograd
