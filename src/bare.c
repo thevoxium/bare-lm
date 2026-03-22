@@ -1302,3 +1302,28 @@ Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val) {
   r->backward = backward_mask;
   return r;
 }
+
+static void backward_scale(Tensor *self) {
+  Tensor *a = self->parents[0];
+  float v = self->op_params[0];
+  for (int i = 0; i < a->numel; i++) {
+    a->grad[i] += (self->grad[i] * v);
+  }
+}
+
+Tensor *scale_t(Memory *mem, Tensor *a, float v) {
+  CHECK(a, "scale_t: invalid params");
+  Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
+  CHECK(r, "scale_t: r failed");
+  for (int i = 0; i < a->numel; i++) {
+    r->data[i] = a->data[i] * v;
+  }
+
+  r->op = SCALE;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op_params[0] = v;
+  r->backward = backward_scale;
+
+  return r;
+}
