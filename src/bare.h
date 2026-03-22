@@ -50,6 +50,7 @@ typedef enum Op {
   RESHAPE,
   BROADCAST,
   CROSSENTROPY,
+  MASK,
 } Op;
 
 typedef struct Arena {
@@ -137,6 +138,7 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim);
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *unsqueeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim);
+Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val);
 
 void sgd_step(ParameterList *pl, float lr);
 

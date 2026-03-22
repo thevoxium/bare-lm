@@ -1269,3 +1269,36 @@ void sgd_step(ParameterList *pl, float lr) {
     }
   }
 }
+
+static void backward_mask(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *b = self->parents[1];
+
+  for (int i = 0; i < a->numel; i++) {
+    if (b->data[i] == 0) {
+      a->grad[i] += (self->grad[i]);
+    }
+  }
+}
+
+Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val) {
+  CHECK(a && b && a->numel == b->numel && a->ndim == b->ndim,
+        "mask_t: invalid parmas");
+
+  Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
+  CHECK(r, "mask_t: tensor zeroes failed");
+
+  for (int i = 0; i < a->numel; i++) {
+    if (b->data[i] == 1) {
+      r->data[i] = val;
+    } else {
+      r->data[i] = a->data[i];
+    }
+  }
+
+  r->op = MASK;
+  r->parents[0] = a;
+  r->parents[1] = b;
+  r->backward = backward_mask;
+  return r;
+}
