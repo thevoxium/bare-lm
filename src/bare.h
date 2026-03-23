@@ -56,6 +56,7 @@ typedef enum Op {
   CONCAT,
   SLICE,
   PERMUTE,
+  SOFTMAX,
 } Op;
 
 typedef struct Arena {
@@ -120,8 +121,8 @@ void param_list_add(Memory *mem, ParameterList *pl, Tensor *t);
 Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out);
 Tensor *linear_t(Memory *mem, Linear *l, Tensor *x);
 
-LayerNorm *create_layernorm(Memory *mem, ParameterList *pl, int normalized_shape,
-                            float eps);
+LayerNorm *create_layernorm(Memory *mem, ParameterList *pl,
+                            int normalized_shape, float eps);
 Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x);
 
 void backward(Memory *mem, Tensor *root);
@@ -164,7 +165,8 @@ Tensor *scale_t(Memory *mem, Tensor *a, float v);
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim);
+Tensor *softmax_t(Memory *mem, Tensor *a, int dim);
 
 void sgd_step(ParameterList *pl, float lr);
 
-#endif // !BARE_H
+#endif //! BARE_H

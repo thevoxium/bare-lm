@@ -1000,8 +1000,8 @@ static void backward_bmm(Tensor *self) {
 }
 
 Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->ndim == 3 && b->ndim == 3 &&
-            a->shape[0] == b->shape[0] && a->shape[2] == b->shape[1],
+  CHECK(a && b && a->ndim == 3 && b->ndim == 3 && a->shape[0] == b->shape[0] &&
+            a->shape[2] == b->shape[1],
         "bmm_t: invalid param");
 
   int B = a->shape[0];
@@ -1742,5 +1742,49 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
     r->op_params[i] = dims[i];
   }
   r->backward = backward_permute;
+  return r;
+}
+
+Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
+  CHECK(a && dim >= 0 && dim < a->ndim, "softmax_t: invalid params");
+
+  Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
+  CHECK(r, "softmax_t: error in allocating r");
+
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int idx[a->ndim];
+    for (int d = r->ndim - 1; d >= 0; d--) {
+      idx[d] = curr % r->shape[d];
+      curr /= r->shape[d];
+    }
+
+    int a_idx = 0;
+    for (int d = 0; d < a->ndim; d++) {
+      if (d != dim) {
+        a_idx += (idx[d] * a->strides[d]);
+      }
+    }
+
+    float m = -1e10;
+    for (int k = 0; k < r->shape[dim]; k++) {
+      float v = a->data[a_idx + k * a->strides[dim]];
+      if (m < v)
+        m = v;
+    }
+    float sum = 0.0f;
+    for (int k = 0; k < r->shape[dim]; k++) {
+      sum += (expf(a->data[a_idx + k * a->strides[dim]] - m));
+    }
+
+    int k = idx[dim];
+    r->data[i] = expf(a->data[a_idx + k * a->strides[dim]] - m) / sum;
+  }
+
+  r->op = SOFTMAX;
+  r->op_params[0] = dim;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+
   return r;
 }
