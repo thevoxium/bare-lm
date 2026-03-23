@@ -54,6 +54,7 @@ typedef enum Op {
   SCALE,
   CONCAT,
   SLICE,
+  PERMUTE,
 } Op;
 
 typedef struct Arena {
@@ -150,6 +151,7 @@ Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val);
 Tensor *scale_t(Memory *mem, Tensor *a, float v);
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
+Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim);
 
 void sgd_step(ParameterList *pl, float lr);
 
