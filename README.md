@@ -186,9 +186,10 @@ sgd_step(pl, 0.01f); // update all parameters
 | `add_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Element-wise a + b |
 | `sub_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Element-wise a - b |
 | `mul_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Element-wise a * b |
-| `divi_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Element-wise a / b |
+| `divide_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Element-wise a / b |
 | `neg_t` | `(Memory*, Tensor *a) → Tensor*` | Element-wise -a |
 | `pow_t` | `(Memory*, Tensor *a, float exp) → Tensor*` | Element-wise pow(a, exp) |
+| `scale_t` | `(Memory*, Tensor *a, float v) → Tensor*` | Element-wise a * scalar |
 
 ### Math
 
@@ -204,7 +205,6 @@ sgd_step(pl, 0.01f); // update all parameters
 | `sum_t` | `(Memory*, Tensor *a, int dim) → Tensor*` | Sum along dimension |
 | `mean_t` | `(Memory*, Tensor *a, int dim) → Tensor*` | Mean along dimension |
 | `max_t` | `(Memory*, Tensor *a, int dim) → Tensor*` | Max along dimension |
-| `dot_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Dot product (1D) |
 
 ### Activations
 
@@ -214,13 +214,22 @@ sgd_step(pl, 0.01f); // update all parameters
 | `gelu_t` | `(Memory*, Tensor *a) → Tensor*` | GELU (tanh approximation) |
 | `sigmoid_t` | `(Memory*, Tensor *a) → Tensor*` | Sigmoid |
 | `tanh_t` | `(Memory*, Tensor *a) → Tensor*` | Tanh |
+| `softmax_t` | `(Memory*, Tensor *a, int dim) → Tensor*` | Softmax along dimension |
+
+### Masking
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `mask_t` | `(Memory*, Tensor *a, Tensor *b, float val) → Tensor*` | Where b==1, set to val; else keep a |
 
 ### Linear Algebra
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `matmul_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Matrix multiply (2D) |
+| `bmm_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Batch matrix multiply (3D: [B,T,D] x [B,D,T] → [B,T,T]) |
 | `transpose_t` | `(Memory*, Tensor *a) → Tensor*` | Transpose 2D |
+| `dot_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Dot product (1D) |
 
 ### Shape Operations
 
@@ -230,6 +239,9 @@ sgd_step(pl, 0.01f); // update all parameters
 | `squeeze_t` | `(Memory*, Tensor *a, int dim) → Tensor*` | Remove dim of size 1 |
 | `unsqueeze_t` | `(Memory*, Tensor *a, int dim) → Tensor*` | Insert dim of size 1 |
 | `broadcast_t` | `(Memory*, Tensor *a, int *shape, int tar_dim) → Tensor*` | Broadcast to target shape |
+| `permute_t` | `(Memory*, Tensor *a, int *dims, int total_dim) → Tensor*` | Permute dimensions |
+| `concat_t` | `(Memory*, Tensor *a, Tensor *b, int dim) → Tensor*` | Concatenate along dimension |
+| `slice_t` | `(Memory*, Tensor *a, int dim, int split_size) → Pair_T*` | Split tensor along dim, returns pair {F, S} |
 
 ### Loss Functions
 
@@ -244,6 +256,8 @@ sgd_step(pl, 0.01f); // update all parameters
 |----------|-----------|-------------|
 | `create_linear` | `(Memory*, ParameterList *pl, int d_in, int d_out) → Linear*` | Linear layer, auto-registers weights + bias |
 | `linear_t` | `(Memory*, Linear*, Tensor *x) → Tensor*` | Forward: x @ W^T + b |
+| `create_layernorm` | `(Memory*, ParameterList *pl, int normalized_shape, float eps) → LayerNorm*` | LayerNorm, auto-registers weight + bias |
+| `layernorm_t` | `(Memory*, LayerNorm*, Tensor *x) → Tensor*` | Layer normalization forward |
 
 ### Autograd
 
