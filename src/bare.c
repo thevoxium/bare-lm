@@ -1327,3 +1327,93 @@ Tensor *scale_t(Memory *mem, Tensor *a, float v) {
 
   return r;
 }
+
+static void backward_concat(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *b = self->parents[1];
+  Tensor *r = self;
+  int dim = self->op_params[0];
+
+  for (int i = 0; i < r->numel; i++) {
+    int curr_idx = i;
+    int idx[r->ndim];
+
+    for (int d = r->ndim - 1; d >= 0; d--) {
+      idx[d] = curr_idx % r->shape[d];
+      curr_idx /= r->shape[d];
+    }
+
+    if (idx[dim] < a->shape[dim]) {
+      int a_idx = 0;
+      for (int d = 0; d < a->ndim; d++) {
+        a_idx += (idx[d] * a->strides[d]);
+      }
+      a->grad[a_idx] += self->grad[i];
+    } else {
+      int b_idx = 0;
+      for (int d = 0; d < b->ndim; d++) {
+        int mapped = idx[d];
+        if (d == dim) {
+          mapped -= a->shape[dim];
+        }
+        b_idx += (mapped * b->strides[d]);
+      }
+      b->grad[b_idx] += self->grad[i];
+    }
+  }
+}
+
+Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim) {
+  CHECK(a && b && dim >= 0 && a->ndim == b->ndim && dim < a->ndim,
+        "concat_t: invalid params");
+
+  int out_shape[a->ndim];
+
+  for (int i = 0; i < a->ndim; i++) {
+    if (a->shape[i] != b->shape[i]) {
+      CHECK(i == dim, "concat_t: not compatible for concat");
+      out_shape[i] = a->shape[i] + b->shape[i];
+    } else {
+      out_shape[i] = a->shape[i];
+    }
+  }
+
+  Tensor *r = tensor_zeros(mem, out_shape, a->ndim, TEMP);
+  CHECK(r, "concat_t: error in result allocations");
+
+  for (int i = 0; i < r->numel; i++) {
+    int curr_idx = i;
+    int idx[r->ndim];
+
+    for (int d = r->ndim - 1; d >= 0; d--) {
+      idx[d] = curr_idx % r->shape[d];
+      curr_idx /= r->shape[d];
+    }
+
+    if (idx[dim] < a->shape[dim]) {
+      int a_idx = 0;
+      for (int d = 0; d < a->ndim; d++) {
+        a_idx += (idx[d] * a->strides[d]);
+      }
+      r->data[i] = a->data[a_idx];
+    } else {
+      int b_idx = 0;
+      for (int d = 0; d < b->ndim; d++) {
+        int mapped = idx[d];
+        if (d == dim) {
+          mapped -= a->shape[dim];
+        }
+        b_idx += (mapped * b->strides[d]);
+      }
+      r->data[i] = b->data[b_idx];
+    }
+  }
+
+  r->op = CONCAT;
+  r->parents[0] = a;
+  r->parents[1] = b;
+  r->op_params[0] = dim;
+  r->backward = backward_concat;
+
+  return r;
+}
