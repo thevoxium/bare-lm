@@ -1287,49 +1287,25 @@ Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x) {
   int last_dim = x->ndim - 1;
 
   Tensor *mean = mean_t(mem, x, last_dim);
-  CHECK(mean, "layernorm_t: mean failed");
-
   Tensor *mean_b = broadcast_t(mem, mean, x->shape, x->ndim);
-  CHECK(mean_b, "layernorm_t: broadcast mean failed");
-
   Tensor *diff = sub_t(mem, x, mean_b);
-  CHECK(diff, "layernorm_t: diff failed");
-
   Tensor *diff_sq = pow_t(mem, diff, 2.0f);
-  CHECK(diff_sq, "layernorm_t: diff_sq failed");
-
   Tensor *var = mean_t(mem, diff_sq, last_dim);
-  CHECK(var, "layernorm_t: var failed");
 
   int var_shape[] = {var->shape[0]};
+
   Tensor *eps_t = tensor_zeros(mem, var_shape, 1, TEMP);
-  CHECK(eps_t, "layernorm_t: eps_t failed");
   for (int i = 0; i < eps_t->numel; i++)
     eps_t->data[i] = ln->eps;
 
   Tensor *var_plus_eps = add_t(mem, var, eps_t);
-  CHECK(var_plus_eps, "layernorm_t: var_plus_eps failed");
-
   Tensor *std = pow_t(mem, var_plus_eps, 0.5f);
-  CHECK(std, "layernorm_t: std failed");
-
   Tensor *std_b = broadcast_t(mem, std, x->shape, x->ndim);
-  CHECK(std_b, "layernorm_t: broadcast std failed");
-
   Tensor *normed = divide_t(mem, diff, std_b);
-  CHECK(normed, "layernorm_t: normed failed");
-
   Tensor *gamma_b = broadcast_t(mem, ln->weight, x->shape, x->ndim);
-  CHECK(gamma_b, "layernorm_t: broadcast gamma failed");
-
   Tensor *out = mul_t(mem, gamma_b, normed);
-  CHECK(out, "layernorm_t: mul gamma failed");
-
   Tensor *beta_b = broadcast_t(mem, ln->bias, x->shape, x->ndim);
-  CHECK(beta_b, "layernorm_t: broadcast beta failed");
-
   out = add_t(mem, out, beta_b);
-  CHECK(out, "layernorm_t: add beta failed");
 
   return out;
 }
