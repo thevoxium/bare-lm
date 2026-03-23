@@ -94,6 +94,12 @@ typedef struct Linear {
   Tensor *bias;
 } Linear;
 
+typedef struct LayerNorm {
+  Tensor *weight;
+  Tensor *bias;
+  float eps;
+} LayerNorm;
+
 typedef struct Pair_T {
   Tensor *F;
   Tensor *S;
@@ -112,6 +118,10 @@ void param_list_add(Memory *mem, ParameterList *pl, Tensor *t);
 
 Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out);
 Tensor *linear_t(Memory *mem, Linear *l, Tensor *x);
+
+LayerNorm *create_layernorm(Memory *mem, ParameterList *pl, int normalized_shape,
+                            float eps);
+Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x);
 
 void backward(Memory *mem, Tensor *root);
 
