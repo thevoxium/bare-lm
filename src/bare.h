@@ -53,6 +53,7 @@ typedef enum Op {
   MASK,
   SCALE,
   CONCAT,
+  SLICE,
 } Op;
 
 typedef struct Arena {
@@ -76,7 +77,7 @@ typedef struct Tensor {
   int numel;
   Op op;
   void (*backward)(struct Tensor *self);
-  float op_params[2];
+  float op_params[4];
 } Tensor;
 
 typedef struct Dt_array {
@@ -91,6 +92,11 @@ typedef struct Linear {
   Tensor *weights;
   Tensor *bias;
 } Linear;
+
+typedef struct Pair_T {
+  Tensor *F;
+  Tensor *S;
+} Pair_T;
 
 Memory *create_global_mem(size_t size);
 void reset_temp_mem(Memory *mem);
@@ -143,6 +149,7 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim);
 Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val);
 Tensor *scale_t(Memory *mem, Tensor *a, float v);
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);
+Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
 
 void sgd_step(ParameterList *pl, float lr);
 

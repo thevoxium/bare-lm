@@ -1417,3 +1417,124 @@ Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim) {
 
   return r;
 }
+
+static void backward_slice(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *r = self;
+  int dim = r->op_params[0];
+  int split_size = r->op_params[2];
+  if (r->op_params[1] == 1) {
+    for (int i = 0; i < r->numel; i++) {
+      int idx[r->ndim];
+      int curr = i;
+      for (int d = r->ndim - 1; d >= 0; d--) {
+        idx[d] = curr % r->shape[d];
+        curr /= r->shape[d];
+      }
+
+      int a_idx = 0;
+      for (int d = 0; d < r->ndim; d++) {
+        a_idx += (idx[d] * a->strides[d]);
+      }
+      a->grad[a_idx] += self->grad[i];
+    }
+  } else {
+    for (int i = 0; i < r->numel; i++) {
+      int idx[r->ndim];
+      int curr = i;
+      for (int d = r->ndim - 1; d >= 0; d--) {
+        idx[d] = curr % r->shape[d];
+        curr /= r->shape[d];
+      }
+
+      int a_idx = 0;
+      for (int d = 0; d < r->ndim; d++) {
+        int mapped = idx[d];
+        if (d == dim) {
+          mapped += split_size;
+        }
+        a_idx += (mapped * a->strides[d]);
+      }
+      a->grad[a_idx] += self->grad[i];
+    }
+  }
+}
+
+Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size) {
+  CHECK(a && dim >= 0 && dim < a->ndim && split_size <= a->shape[dim] &&
+            split_size > 0,
+        "slice_t: invalid params");
+  Pair_T *r = allocate_mem(mem, sizeof(Pair_T), TEMP);
+  CHECK(r, "slice_t: result allocation failed");
+
+  int f_shape[a->ndim];
+  int s_shape[a->ndim];
+
+  for (int i = 0; i < a->ndim; i++) {
+    if (i == dim) {
+      f_shape[i] = split_size;
+      s_shape[i] = a->shape[i] - split_size;
+    } else {
+      f_shape[i] = a->shape[i];
+      s_shape[i] = a->shape[i];
+    }
+  }
+
+  r->F = tensor_zeros(mem, f_shape, a->ndim, TEMP);
+  CHECK(r->F, "slice_t: r.F failed");
+  r->S = tensor_zeros(mem, s_shape, a->ndim, TEMP);
+  CHECK(r->S, "slice_t: r.S failed");
+
+  for (int i = 0; i < r->F->numel; i++) {
+    int idx[r->F->ndim];
+    int curr = i;
+    for (int d = r->F->ndim - 1; d >= 0; d--) {
+      idx[d] = curr % r->F->shape[d];
+      curr /= r->F->shape[d];
+    }
+
+    int a_idx = 0;
+    for (int d = 0; d < r->F->ndim; d++) {
+      a_idx += (idx[d] * a->strides[d]);
+    }
+    r->F->data[i] = a->data[a_idx];
+  }
+
+  for (int i = 0; i < r->S->numel; i++) {
+    int idx[r->S->ndim];
+    int curr = i;
+    for (int d = r->S->ndim - 1; d >= 0; d--) {
+      idx[d] = curr % r->S->shape[d];
+      curr /= r->S->shape[d];
+    }
+
+    int a_idx = 0;
+    for (int d = 0; d < r->S->ndim; d++) {
+      int mapped = idx[d];
+      if (d == dim) {
+        mapped += r->F->shape[dim];
+      }
+      a_idx += (mapped * a->strides[d]);
+    }
+    r->S->data[i] = a->data[a_idx];
+  }
+
+  r->F->op_params[0] = dim;
+  r->F->op_params[1] =
+      1; // 1 if it is the first tensor, F, 2, if it is S. Helpful for backprop
+  r->F->op_params[2] = split_size;
+  r->F->parents[0] = a;
+  r->F->parents[1] = NULL;
+  r->F->op = SLICE;
+  r->F->backward = backward_slice;
+
+  r->S->op_params[0] = dim;
+  r->S->op_params[1] = 2;
+  r->S->op_params[2] = split_size;
+  r->S->parents[0] = a;
+  r->S->parents[1] = NULL;
+  r->S->op = SLICE;
+  r->S->backward = backward_slice;
+
+  return r;
+}
