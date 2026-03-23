@@ -958,6 +958,86 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   return r;
 }
 
+static void backward_bmm(Tensor *self) {
+  Tensor *a = self->parents[0]; // (B, T, D)
+  Tensor *b = self->parents[1]; // (B, D, T)
+
+  int B = a->shape[0];
+  int T = a->shape[1];
+  int D = a->shape[2];
+
+  int a_stride = T * D;
+  int b_stride = D * T;
+  int out_stride = T * T;
+
+  for (int bi = 0; bi < B; bi++) {
+    float *a_data = a->data + bi * a_stride;
+    float *b_data = b->data + bi * b_stride;
+    float *a_grad = a->grad + bi * a_stride;
+    float *b_grad = b->grad + bi * b_stride;
+    float *self_grad = self->grad + bi * out_stride;
+
+    for (int i = 0; i < T; i++) {
+      for (int k = 0; k < D; k++) {
+        float sum = 0.0f;
+        for (int j = 0; j < T; j++) {
+          sum += self_grad[i * T + j] * b_data[k * T + j];
+        }
+        a_grad[i * D + k] += sum;
+      }
+    }
+
+    for (int k = 0; k < D; k++) {
+      for (int j = 0; j < T; j++) {
+        float sum = 0.0f;
+        for (int i = 0; i < T; i++) {
+          sum += a_data[i * D + k] * self_grad[i * T + j];
+        }
+        b_grad[k * T + j] += sum;
+      }
+    }
+  }
+}
+
+Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
+  CHECK(a && b && a->ndim == 3 && b->ndim == 3 &&
+            a->shape[0] == b->shape[0] && a->shape[2] == b->shape[1],
+        "bmm_t: invalid param");
+
+  int B = a->shape[0];
+  int T = a->shape[1];
+  int D = a->shape[2];
+
+  int result_shape[] = {B, T, T};
+  Tensor *r = tensor_zeros(mem, result_shape, 3, TEMP);
+
+  int a_stride = T * D;
+  int b_stride = D * T;
+  int out_stride = T * T;
+
+  for (int bi = 0; bi < B; bi++) {
+    float *a_data = a->data + bi * a_stride;
+    float *b_data = b->data + bi * b_stride;
+    float *r_data = r->data + bi * out_stride;
+
+    for (int i = 0; i < T; i++) {
+      for (int j = 0; j < T; j++) {
+        float sum = 0.0f;
+        for (int k = 0; k < D; k++) {
+          sum += a_data[i * D + k] * b_data[k * T + j];
+        }
+        r_data[i * T + j] = sum;
+      }
+    }
+  }
+
+  r->op = BMM;
+  r->parents[0] = a;
+  r->parents[1] = b;
+  r->backward = backward_bmm;
+  return r;
+}
+
 static void backward_transpose(Tensor *self) {
   Tensor *a = self->parents[0];
 

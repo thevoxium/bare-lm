@@ -46,6 +46,7 @@ typedef enum Op {
   TANH,
   MSELOSS,
   MATMUL,
+  BMM,
   TRANSPOSE,
   RESHAPE,
   BROADCAST,
@@ -152,6 +153,7 @@ Tensor *tanh_t(Memory *mem, Tensor *a);
 Tensor *mseloss_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *crossentropyloss_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b);
+Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *transpose_t(Memory *mem, Tensor *a);
 Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim);
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim);
