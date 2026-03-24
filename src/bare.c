@@ -3,7 +3,7 @@
 
 Memory *create_global_mem(size_t size) {
   Memory *mem = (Memory *)malloc(sizeof(Memory));
-  CHECK(mem, "create_global_mem: could not allocated mem");
+  CHECK(mem, "create_global_mem: failed to allocate Memory struct");
 
   mem->perm = (Arena *)malloc(sizeof(Arena));
   mem->temp = (Arena *)malloc(sizeof(Arena));
@@ -23,12 +23,12 @@ Memory *create_global_mem(size_t size) {
 }
 
 void reset_temp_mem(Memory *mem) {
-  CHECK_VOID(mem, "reset_temp_mem: error resetting mem");
+  CHECK_VOID(mem, "reset_temp_mem: mem is NULL");
   mem->temp->used = 0;
 }
 
 void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
-  CHECK(mem && size > 0, "allocate_mem: invalid params");
+  CHECK(mem && size > 0, "allocate_mem: mem is NULL or size is 0");
   size = (size + 7) & ~7;
   void *ptr = NULL;
   if (perm) {
@@ -46,7 +46,7 @@ void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
 }
 
 void free_global_mem(Memory *mem) {
-  CHECK_VOID(mem, "free_global_mem: error freeing mem");
+  CHECK_VOID(mem, "free_global_mem: mem is NULL");
   free(mem->perm->buffer);
   free(mem->temp->buffer);
   free(mem->temp);
@@ -55,17 +55,17 @@ void free_global_mem(Memory *mem) {
 }
 
 ParameterList *create_param_list(Memory *mem) {
-  CHECK(mem, "create_parameter_list: mem is NULL");
+  CHECK(mem, "create_param_list: mem is NULL");
   return dt_array_create(mem, PERM);
 }
 
 void param_list_add(Memory *mem, ParameterList *pl, Tensor *t) {
-  CHECK_VOID(pl && t, "param_list_add: invalid params");
+  CHECK_VOID(pl && t, "param_list_add: pl or t is NULL");
   return dt_array_push(mem, pl, t, PERM);
 }
 
 void zero_grad(ParameterList *pl) {
-  CHECK_VOID(pl, "zero_grad: invalid params");
+  CHECK_VOID(pl, "zero_grad: pl is NULL");
   for (int i = 0; i < pl->count; i++) {
     Tensor *t = pl->t[i];
     memset(t->grad, 0, sizeof(float) * t->numel);
@@ -174,10 +174,10 @@ void backward(Memory *mem, Tensor *root) {
   CHECK_VOID(root, "backward: root is NULL");
 
   Dt_array *result = dt_array_create(mem, TEMP);
-  CHECK_VOID(result, "backward: result failed");
+  CHECK_VOID(result, "backward: failed to create result array");
 
   Dt_array *visited = dt_array_create(mem, TEMP);
-  CHECK_VOID(visited, "backward: visited failed");
+  CHECK_VOID(visited, "backward: failed to create visited array");
 
   build_topo(mem, root, result, visited);
 
@@ -196,10 +196,10 @@ void backward(Memory *mem, Tensor *root) {
 }
 
 Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
-  CHECK(mem && shape && ndim > 0, "tensor_init: param is invalid");
+  CHECK(mem && shape && ndim > 0, "tensor_init: mem is NULL, shape is NULL, or ndim <= 0");
 
   Tensor *t = allocate_mem(mem, sizeof(Tensor), perm);
-  CHECK(t, "tensor_init: alloc failed");
+  CHECK(t, "tensor_init: failed to allocate Tensor struct");
 
   t->ndim = ndim;
   t->numel = 1;
@@ -241,7 +241,7 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
 
 float tensor_get(Tensor *t, int *indices) {
   if (!t || !indices) {
-    ERROR("get: invalid param");
+    ERROR("tensor_get: t or indices is NULL");
     return 0.0f;
   }
   int idx = 0;
@@ -300,10 +300,10 @@ static void backward_add(Tensor *self) {
 }
 
 Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "add: param is invalid");
+  CHECK(a && b && a->numel == b->numel, "add_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "add: tensor_init failed");
+  CHECK(r, "add_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = a->data[i] + b->data[i];
@@ -329,10 +329,10 @@ static void backward_sub(Tensor *self) {
 }
 
 Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "sub: param is invalid");
+  CHECK(a && b && a->numel == b->numel, "sub_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "sub: tensor_init failed");
+  CHECK(r, "sub_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = a->data[i] - b->data[i];
@@ -358,10 +358,10 @@ static void backward_mul(Tensor *self) {
 }
 
 Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "mul: param is invalid");
+  CHECK(a && b && a->numel == b->numel, "mul_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "mul: tensor_init failed");
+  CHECK(r, "mul_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = a->data[i] * b->data[i];
@@ -387,7 +387,7 @@ static void backward_div(Tensor *self) {
 }
 
 Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "divide_t: param is invalid");
+  CHECK(a && b && a->numel == b->numel, "divide_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "divide_t: tensor_init failed");
@@ -413,10 +413,10 @@ static void backward_neg(Tensor *self) {
 }
 
 Tensor *neg_t(Memory *mem, Tensor *a) {
-  CHECK(a, "neg: param is invalid");
+  CHECK(a, "neg_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "neg: tensor_init failed");
+  CHECK(r, "neg_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = -a->data[i];
@@ -441,17 +441,17 @@ static void backward_pow(Tensor *self) {
 }
 
 Tensor *pow_t(Memory *mem, Tensor *a, float exponent) {
-  CHECK(a, "pow_op: param is invalid");
+  CHECK(a, "pow_t: a is NULL");
 
   for (int i = 0; i < a->numel; i++) {
     CHECK(!(a->data[i] < 0.0f && exponent != (int)exponent),
-          "pow_op: negative base with non-integer exponent");
+           "pow_t: negative base with non-integer exponent");
     CHECK(!(a->data[i] == 0.0f && exponent < 0.0f),
-          "pow_op: zero base with negative exponent");
+           "pow_t: zero base with negative exponent");
   }
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "pow_op: tensor_init failed");
+  CHECK(r, "pow_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = powf(a->data[i], exponent);
@@ -474,10 +474,10 @@ static void backward_exp(Tensor *self) {
 }
 
 Tensor *exp_t(Memory *mem, Tensor *a) {
-  CHECK(a, "exp_op: param is invalid");
+  CHECK(a, "exp_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "exp_op: tensor_init failed");
+  CHECK(r, "exp_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = expf(a->data[i]);
@@ -500,10 +500,10 @@ static void backward_log(Tensor *self) {
 }
 
 Tensor *log_t(Memory *mem, Tensor *a) {
-  CHECK(a, "log_op: param is invalid");
+  CHECK(a, "log_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "log_op: tensor_init failed");
+  CHECK(r, "log_t: tensor_init failed");
 
   for (int i = 0; i < r->numel; i++) {
     r->data[i] = logf(a->data[i]);
@@ -555,7 +555,7 @@ static void backward_sum(Tensor *self) {
 }
 
 Tensor *sum_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "sum_t: param invalid");
+  CHECK(a && dim >= 0 && dim < a->ndim, "sum_t: a is NULL or dim out of bounds");
 
   int out_ndim;
   int shape[a->ndim];
@@ -574,7 +574,7 @@ Tensor *sum_t(Memory *mem, Tensor *a, int dim) {
   }
 
   Tensor *out = tensor_init(mem, shape, out_ndim, TEMP);
-  CHECK(out, "sum_t: out failed");
+  CHECK(out, "sum_t: failed to create output tensor");
 
   int outer = 1, inner = 1, reduce = a->shape[dim];
   for (int i = 0; i < dim; i++)
@@ -654,7 +654,7 @@ static void backward_dot(Tensor *self) {
 Tensor *dot_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == b->ndim && a->ndim == 1 &&
             a->shape[0] == b->shape[0],
-        "dot_t: invalid param");
+         "dot_t: a is NULL, b is NULL, or tensors are not 1D with matching sizes");
 
   int shape[] = {1};
   Tensor *r = tensor_zeros(mem, shape, 1, TEMP);
@@ -705,7 +705,7 @@ static void backward_max(Tensor *self) {
 }
 
 Tensor *max_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "max_t: param invalid");
+  CHECK(a && dim >= 0 && dim < a->ndim, "max_t: a is NULL or dim out of bounds");
   int out_ndim;
   int shape[a->ndim];
 
@@ -723,7 +723,7 @@ Tensor *max_t(Memory *mem, Tensor *a, int dim) {
   }
 
   Tensor *out = tensor_init(mem, shape, out_ndim, TEMP);
-  CHECK(out, "max_t: out failed");
+  CHECK(out, "max_t: failed to create output tensor");
 
   int outer = 1, inner = 1, reduce = a->shape[dim];
   for (int i = 0; i < dim; i++)
@@ -757,7 +757,7 @@ static void backward_relu(Tensor *self) {
 }
 
 Tensor *relu_t(Memory *mem, Tensor *a) {
-  CHECK(a, "relu_t: param is invalid");
+  CHECK(a, "relu_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "relu_t: tensor_init failed");
@@ -794,7 +794,7 @@ static void backward_gelu(Tensor *self) {
 }
 
 Tensor *gelu_t(Memory *mem, Tensor *a) {
-  CHECK(a, "gelu_t: param is invalid");
+  CHECK(a, "gelu_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "gelu_t: tensor_init failed");
@@ -828,7 +828,7 @@ static void backward_sigmoid(Tensor *self) {
 }
 
 Tensor *sigmoid_t(Memory *mem, Tensor *a) {
-  CHECK(a, "sigmoid_t: param is invalid");
+  CHECK(a, "sigmoid_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "sigmoid_t: tensor_init failed");
@@ -856,7 +856,7 @@ static void backward_tanh(Tensor *self) {
 }
 
 Tensor *tanh_t(Memory *mem, Tensor *a) {
-  CHECK(a, "tanh_t: param is invalid");
+  CHECK(a, "tanh_t: a is NULL");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "tanh_t: tensor_init failed");
@@ -888,7 +888,7 @@ static void backward_mse(Tensor *self) {
 }
 
 Tensor *mseloss_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "mseloss_t: invalid params");
+  CHECK(a && b && a->numel == b->numel, "mseloss_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   int shape[] = {1};
   Tensor *r = tensor_zeros(mem, shape, 1, TEMP);
@@ -937,7 +937,7 @@ static void backward_matmul(Tensor *self) {
 Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == b->ndim && a->ndim == 2 &&
             a->shape[1] == b->shape[0],
-        "matmul_t: invalid param");
+         "matmul_t: a is NULL, b is NULL, or tensors are not compatible 2D matrices");
   int result_shape[] = {a->shape[0], b->shape[1]};
   Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
 
@@ -1002,7 +1002,7 @@ static void backward_bmm(Tensor *self) {
 Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == 3 && b->ndim == 3 && a->shape[0] == b->shape[0] &&
             a->shape[2] == b->shape[1],
-        "bmm_t: invalid param");
+         "bmm_t: a is NULL, b is NULL, or tensors are not compatible 3D batch matrices");
 
   int B = a->shape[0];
   int T = a->shape[1];
@@ -1053,7 +1053,7 @@ static void backward_transpose(Tensor *self) {
 }
 
 Tensor *transpose_t(Memory *mem, Tensor *a) {
-  CHECK(a && a->ndim == 2, "transpose_t: invalid param");
+  CHECK(a && a->ndim == 2, "transpose_t: a is NULL or not a 2D tensor");
   int result_shape[] = {a->shape[1], a->shape[0]};
   Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
   CHECK(r, "transpose_t: result tensor failed");
@@ -1079,7 +1079,7 @@ static void backward_reshape(Tensor *self) {
 }
 
 Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
-  CHECK(a, "reshape_t: invalid param");
+  CHECK(a, "reshape_t: a is NULL");
 
   int numel = 1;
   for (int i = 0; i < ndim; i++) {
@@ -1101,9 +1101,9 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
 }
 
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "squeeze_t: invalid params");
+  CHECK(a && dim >= 0 && dim < a->ndim, "squeeze_t: a is NULL or dim out of bounds");
 
-  CHECK(a->shape[dim] == 1, "squeeze_t: dim != 1");
+  CHECK(a->shape[dim] == 1, "squeeze_t: dimension to squeeze must have size 1");
 
   int result_shape[a->ndim - 1];
   for (int i = 0, j = 0; i < a->ndim; i++) {
@@ -1116,7 +1116,7 @@ Tensor *squeeze_t(Memory *mem, Tensor *a, int dim) {
 }
 
 Tensor *unsqueeze_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim <= a->ndim, "unsqueeze_t: invalid params");
+  CHECK(a && dim >= 0 && dim <= a->ndim, "unsqueeze_t: a is NULL or dim out of bounds");
 
   int result_shape[a->ndim + 1];
   for (int i = 0, j = 0; i < a->ndim + 1; i++) {
@@ -1179,7 +1179,7 @@ for getting value from a->data Output index â†’ collapse broadcasted dims to 0 â
 read from input.
 */
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
-  CHECK(a && shape && tar_dim >= a->ndim, "broadcast_t: invalid param");
+  CHECK(a && shape && tar_dim >= a->ndim, "broadcast_t: a is NULL, shape is NULL, or tar_dim < a->ndim");
 
   int align_shape[tar_dim];
   for (int i = 0; i < tar_dim; i++) {
@@ -1269,7 +1269,7 @@ static void backward_crossentropy(Tensor *self) {
 
 Tensor *crossentropyloss_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == 2 && b->ndim == 1 && a->shape[0] == b->shape[0],
-        "crossentropyloss_t: invalid params");
+         "crossentropyloss_t: a is NULL, b is NULL, or shapes are incompatible");
 
   int N = a->shape[0];
   int C = a->shape[1];
@@ -1307,17 +1307,17 @@ Tensor *crossentropyloss_t(Memory *mem, Tensor *a, Tensor *b) {
 }
 
 Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out) {
-  CHECK(d_out > 0 && d_in > 0, "create_linear: invalid params");
+  CHECK(d_out > 0 && d_in > 0, "create_linear: d_out and d_in must be positive");
   Linear *l = (Linear *)allocate_mem(mem, sizeof(Linear), PERM);
-  CHECK(l, "create_linear: error in creating linear allocation");
+  CHECK(l, "create_linear: failed to allocate Linear struct");
 
   int weight_shape[] = {d_out, d_in};
   int bias_shape[] = {d_out};
   l->weights = tensor_randn(mem, weight_shape, 2, PERM);
-  CHECK(l->weights, "create_linear: weights NULL");
+  CHECK(l->weights, "create_linear: failed to create weights tensor");
 
   l->bias = tensor_randn(mem, bias_shape, 1, PERM);
-  CHECK(l->bias, "create_linear: bias NULL");
+  CHECK(l->bias, "create_linear: failed to create bias tensor");
 
   param_list_add(mem, pl, l->weights);
   param_list_add(mem, pl, l->bias);
@@ -1342,16 +1342,16 @@ Tensor *linear_t(Memory *mem, Linear *l, Tensor *x) {
 
 LayerNorm *create_layernorm(Memory *mem, ParameterList *pl,
                             int normalized_shape, float eps) {
-  CHECK(normalized_shape > 0, "create_layernorm: invalid params");
+  CHECK(normalized_shape > 0, "create_layernorm: normalized_shape must be positive");
   LayerNorm *ln = (LayerNorm *)allocate_mem(mem, sizeof(LayerNorm), PERM);
-  CHECK(ln, "create_layernorm: alloc failed");
+  CHECK(ln, "create_layernorm: failed to allocate LayerNorm struct");
 
   int shape[] = {normalized_shape};
   ln->weight = tensor_ones(mem, shape, 1, PERM);
-  CHECK(ln->weight, "create_layernorm: weight failed");
+  CHECK(ln->weight, "create_layernorm: failed to create weight tensor");
 
   ln->bias = tensor_zeros(mem, shape, 1, PERM);
-  CHECK(ln->bias, "create_layernorm: bias failed");
+  CHECK(ln->bias, "create_layernorm: failed to create bias tensor");
 
   ln->eps = eps;
 
@@ -1413,10 +1413,10 @@ static void backward_mask(Tensor *self) {
 
 Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val) {
   CHECK(a && b && a->numel == b->numel && a->ndim == b->ndim,
-        "mask_t: invalid parmas");
+         "mask_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "mask_t: tensor zeroes failed");
+  CHECK(r, "mask_t: tensor_zeros failed");
 
   for (int i = 0; i < a->numel; i++) {
     if (b->data[i] == 1) {
@@ -1442,9 +1442,9 @@ static void backward_scale(Tensor *self) {
 }
 
 Tensor *scale_t(Memory *mem, Tensor *a, float v) {
-  CHECK(a, "scale_t: invalid params");
+  CHECK(a, "scale_t: a is NULL");
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "scale_t: r failed");
+  CHECK(r, "scale_t: failed to create result tensor");
   for (int i = 0; i < a->numel; i++) {
     r->data[i] = a->data[i] * v;
   }
@@ -1495,7 +1495,7 @@ static void backward_concat(Tensor *self) {
 
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim) {
   CHECK(a && b && dim >= 0 && a->ndim == b->ndim && dim < a->ndim,
-        "concat_t: invalid params");
+         "concat_t: a is NULL, b is NULL, dim out of bounds, or ndim mismatch");
 
   int out_shape[a->ndim];
 
@@ -1509,7 +1509,7 @@ Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim) {
   }
 
   Tensor *r = tensor_zeros(mem, out_shape, a->ndim, TEMP);
-  CHECK(r, "concat_t: error in result allocations");
+  CHECK(r, "concat_t: failed to create result tensor");
 
   for (int i = 0; i < r->numel; i++) {
     int curr_idx = i;
@@ -1593,7 +1593,7 @@ static void backward_slice(Tensor *self) {
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size) {
   CHECK(a && dim >= 0 && dim < a->ndim && split_size <= a->shape[dim] &&
             split_size > 0,
-        "slice_t: invalid params");
+         "slice_t: a is NULL, dim out of bounds, or invalid split_size");
   Pair_T *r = allocate_mem(mem, sizeof(Pair_T), TEMP);
   CHECK(r, "slice_t: result allocation failed");
 
@@ -1611,9 +1611,9 @@ Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size) {
   }
 
   r->F = tensor_zeros(mem, f_shape, a->ndim, TEMP);
-  CHECK(r->F, "slice_t: r.F failed");
+  CHECK(r->F, "slice_t: failed to create first slice tensor");
   r->S = tensor_zeros(mem, s_shape, a->ndim, TEMP);
-  CHECK(r->S, "slice_t: r.S failed");
+  CHECK(r->S, "slice_t: failed to create second slice tensor");
 
   for (int i = 0; i < r->F->numel; i++) {
     int idx[r->F->ndim];
@@ -1703,7 +1703,7 @@ static void backward_permute(Tensor *self) {
 
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   CHECK(a && dims && total_dim <= 4 && total_dim == a->ndim,
-        "permute_t: invalid param");
+         "permute_t: a is NULL, dims is NULL, or invalid dimensions");
 
   int out_shape[a->ndim];
   for (int i = 0; i < a->ndim; i++) {
@@ -1711,7 +1711,7 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   }
 
   Tensor *r = tensor_zeros(mem, out_shape, total_dim, TEMP);
-  CHECK(r, "permute_t: r failed");
+  CHECK(r, "permute_t: failed to create result tensor");
 
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
@@ -1779,10 +1779,10 @@ static void backward_softmax(Tensor *self) {
 }
 
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "softmax_t: invalid params");
+  CHECK(a && dim >= 0 && dim < a->ndim, "softmax_t: a is NULL or dim out of bounds");
 
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
-  CHECK(r, "softmax_t: error in allocating r");
+  CHECK(r, "softmax_t: failed to create result tensor");
 
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
@@ -1848,7 +1848,7 @@ static void backward_embedding(Tensor *self) {
 // a is vocab
 Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
   CHECK(a && a->ndim == 2 && indices && indices->ndim == 2,
-        "embedding_t: invalid params");
+         "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
 
   int V = a->shape[0];
   int D = a->shape[1];
@@ -1859,7 +1859,7 @@ Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
   int out_shape[] = {B, T, D};
 
   Tensor *r = tensor_zeros(mem, out_shape, 3, TEMP);
-  CHECK(r, "embedding_t: r failed");
+  CHECK(r, "embedding_t: failed to create result tensor");
 
   for (int b = 0; b < B; b++) {
     for (int t = 0; t < T; t++) {
