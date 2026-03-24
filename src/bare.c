@@ -1745,6 +1745,39 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   return r;
 }
 
+static void backward_softmax(Tensor *self) {
+  Tensor *a = self->parents[0];
+  Tensor *r = self;
+  int dim = self->op_params[0];
+
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int idx[a->ndim];
+    for (int d = r->ndim - 1; d >= 0; d--) {
+      idx[d] = curr % r->shape[d];
+      curr /= r->shape[d];
+    }
+
+    int a_idx = 0;
+    for (int d = 0; d < a->ndim; d++) {
+      if (d != dim) {
+        a_idx += (idx[d] * a->strides[d]);
+      }
+    }
+
+    float sum = 0.0f;
+    for (int k = 0; k < r->shape[dim]; k++) {
+      int final_idx = a_idx + k * a->strides[dim];
+      sum += r->grad[final_idx] * r->data[final_idx];
+    }
+
+    int k = idx[dim];
+    int final_idx = a_idx + k * a->strides[dim];
+    float data = r->data[final_idx];
+    a->grad[final_idx] += data * (r->grad[final_idx] - sum);
+  }
+}
+
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
   CHECK(a && dim >= 0 && dim < a->ndim, "softmax_t: invalid params");
 
@@ -1785,6 +1818,7 @@ Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
   r->op_params[0] = dim;
   r->parents[0] = a;
   r->parents[1] = NULL;
+  r->backward = backward_softmax;
 
   return r;
 }
