@@ -57,6 +57,7 @@ typedef enum Op {
   SLICE,
   PERMUTE,
   SOFTMAX,
+  EMBEDDING,
 } Op;
 
 typedef struct Arena {
@@ -166,6 +167,7 @@ Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim);
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim);
+Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices);
 
 void sgd_step(ParameterList *pl, float lr);
 
