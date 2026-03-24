@@ -543,28 +543,25 @@ static int find_reduced_dim(Tensor *a, Tensor *out) {
 }
 
 static void backward_sum(Tensor *self) {
+  Tensor *r = self;
   Tensor *a = self->parents[0];
+  int dim = self->op_params[0];
+  int out_dim = self->ndim;
 
-  int dim = find_reduced_dim(a, self);
-  CHECK_VOID(dim >= 0, "backward_sum: could not determine reduced dimension");
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int cord;
+    int a_idx = 0;
+    for (int d = out_dim - 1; d >= 0; d--) {
+      cord = curr % r->shape[d];
+      a_idx += cord * a->strides[(d < dim) ? d : d + 1];
+      curr /= r->shape[d];
+    }
 
-  int outer = 1, inner = 1;
-  int reduce = a->shape[dim];
-
-  for (int i = 0; i < dim; i++)
-    outer *= a->shape[i];
-
-  for (int i = dim + 1; i < a->ndim; i++)
-    inner *= a->shape[i];
-
-  for (int o = 0; o < outer; o++) {
-    int base = o * reduce * inner;
-    for (int i = 0; i < inner; i++) {
-      float grad = self->grad[o * inner + i];
-      for (int r = 0; r < reduce; r++) {
-        int idx = base + r * inner + i;
-        a->grad[idx] += grad;
-      }
+    float g = r->grad[i];
+    for (int k = 0; k < a->shape[dim]; k++) {
+      int final_idx = a_idx + k * a->strides[dim];
+      a->grad[final_idx] += g;
     }
   }
 }
@@ -573,47 +570,48 @@ Tensor *sum_t(Memory *mem, Tensor *a, int dim) {
   CHECK(a && dim >= 0 && dim < a->ndim,
         "sum_t: a is NULL or dim out of bounds");
 
-  int out_ndim;
-  int shape[a->ndim];
-
+  int out_shape[a->ndim];
+  int out_dim;
   if (a->ndim == 1) {
-    out_ndim = 1;
-    shape[0] = 1;
+    out_shape[0] = 1;
+    out_dim = 1;
   } else {
-    int j = 0;
-    for (int i = 0; i < a->ndim; i++) {
-      if (i != dim) {
-        shape[j++] = a->shape[i];
+    for (int d = 0, j = 0; d < a->ndim; d++) {
+      if (d != dim) {
+        out_shape[j++] = a->shape[d];
       }
     }
-    out_ndim = a->ndim - 1;
+    out_dim = a->ndim - 1;
   }
 
-  Tensor *out = tensor_init(mem, shape, out_ndim, TEMP);
-  CHECK(out, "sum_t: failed to create output tensor");
+  Tensor *r = tensor_zeros(mem, out_shape, out_dim, TEMP);
+  CHECK(r, "sum_t: failed to create output tensor");
 
-  int outer = 1, inner = 1, reduce = a->shape[dim];
-  for (int i = 0; i < dim; i++)
-    outer *= a->shape[i];
-  for (int i = dim + 1; i < a->ndim; i++)
-    inner *= a->shape[i];
-
-  for (int o = 0; o < outer; o++) {
-    for (int i = 0; i < inner; i++) {
-      float sum = 0.0f;
-      for (int r = 0; r < reduce; r++) {
-        sum += a->data[o * reduce * inner + r * inner + i];
-      }
-      out->data[o * inner + i] = sum;
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int cord;
+    int a_idx = 0;
+    for (int d = out_dim - 1; d >= 0; d--) {
+      cord = curr % r->shape[d];
+      a_idx += cord * a->strides[(d < dim) ? d : d + 1];
+      curr /= r->shape[d];
     }
+
+    float sum = 0.0f;
+    for (int k = 0; k < a->shape[dim]; k++) {
+      int final_idx = a_idx + k * a->strides[dim];
+      sum += a->data[final_idx];
+    }
+    r->data[i] = sum;
   }
 
-  out->parents[0] = a;
-  out->parents[1] = NULL;
-  out->op = SUM_REDUCTION;
-  out->backward = backward_sum;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op_params[0] = dim;
+  r->op = SUM_REDUCTION;
+  r->backward = backward_sum;
 
-  return out;
+  return r;
 }
 
 static void backward_mean(Tensor *self) {
