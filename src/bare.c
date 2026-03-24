@@ -442,10 +442,11 @@ Tensor *neg_t(Memory *mem, Tensor *a) {
 static void backward_pow(Tensor *self) {
   Tensor *a = self->parents[0];
   float pow_exponent = self->op_params[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] +=
-          self->grad[i] * pow_exponent * powf(a->data[i], pow_exponent - 1);
+
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] +=
+        self->grad[i] * pow_exponent * powf(a->data[i], pow_exponent - 1);
   }
 }
 
@@ -462,7 +463,8 @@ Tensor *pow_t(Memory *mem, Tensor *a, float exponent) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "pow_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = powf(a->data[i], exponent);
   }
 
@@ -476,9 +478,10 @@ Tensor *pow_t(Memory *mem, Tensor *a, float exponent) {
 
 static void backward_exp(Tensor *self) {
   Tensor *a = self->parents[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] += self->grad[i] * self->data[i];
+
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] += self->grad[i] * self->data[i];
   }
 }
 
@@ -488,7 +491,8 @@ Tensor *exp_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "exp_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = expf(a->data[i]);
   }
 
@@ -502,9 +506,10 @@ Tensor *exp_t(Memory *mem, Tensor *a) {
 
 static void backward_log(Tensor *self) {
   Tensor *a = self->parents[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] += self->grad[i] / a->data[i];
+
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] += self->grad[i] / a->data[i];
   }
 }
 
@@ -514,7 +519,8 @@ Tensor *log_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "log_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = logf(a->data[i]);
   }
 
