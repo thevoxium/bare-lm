@@ -196,7 +196,8 @@ void backward(Memory *mem, Tensor *root) {
 }
 
 Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
-  CHECK(mem && shape && ndim > 0, "tensor_init: mem is NULL, shape is NULL, or ndim <= 0");
+  CHECK(mem && shape && ndim > 0,
+        "tensor_init: mem is NULL, shape is NULL, or ndim <= 0");
 
   Tensor *t = allocate_mem(mem, sizeof(Tensor), perm);
   CHECK(t, "tensor_init: failed to allocate Tensor struct");
@@ -291,21 +292,22 @@ Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm) {
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] += self->grad[i];
-    if (b)
-      b->grad[i] += self->grad[i];
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] += self->grad[i];
+    b->grad[i] += self->grad[i];
   }
 }
 
 Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "add_t: a is NULL, b is NULL, or tensor sizes do not match");
+  CHECK(a && b && a->numel == b->numel,
+        "add_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "add_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = a->data[i] + b->data[i];
   }
 
@@ -320,21 +322,22 @@ Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
 static void backward_sub(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] += self->grad[i];
-    if (b)
-      b->grad[i] -= self->grad[i];
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] += self->grad[i];
+    b->grad[i] -= self->grad[i];
   }
 }
 
 Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "sub_t: a is NULL, b is NULL, or tensor sizes do not match");
+  CHECK(a && b && a->numel == b->numel,
+        "sub_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "sub_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = a->data[i] - b->data[i];
   }
 
@@ -349,21 +352,23 @@ Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
 static void backward_mul(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] += self->grad[i] * b->data[i];
-    if (b)
-      b->grad[i] += self->grad[i] * a->data[i];
+
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] += self->grad[i] * b->data[i];
+    b->grad[i] += self->grad[i] * a->data[i];
   }
 }
 
 Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "mul_t: a is NULL, b is NULL, or tensor sizes do not match");
+  CHECK(a && b && a->numel == b->numel,
+        "mul_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "mul_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = a->data[i] * b->data[i];
   }
 
@@ -378,21 +383,23 @@ Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
 static void backward_div(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] += self->grad[i] / b->data[i];
-    if (b)
-      b->grad[i] -= self->grad[i] * a->data[i] / (b->data[i] * b->data[i]);
+
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] += self->grad[i] / b->data[i];
+    b->grad[i] -= self->grad[i] * a->data[i] / (b->data[i] * b->data[i]);
   }
 }
 
 Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "divide_t: a is NULL, b is NULL, or tensor sizes do not match");
+  CHECK(a && b && a->numel == b->numel,
+        "divide_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "divide_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = a->data[i] / b->data[i];
   }
 
@@ -406,9 +413,10 @@ Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
 
 static void backward_neg(Tensor *self) {
   Tensor *a = self->parents[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
-      a->grad[i] -= self->grad[i];
+
+  int N = self->numel;
+  for (int i = 0; i < N; i++) {
+    a->grad[i] -= self->grad[i];
   }
 }
 
@@ -418,7 +426,8 @@ Tensor *neg_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "neg_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
+  int N = r->numel;
+  for (int i = 0; i < N; i++) {
     r->data[i] = -a->data[i];
   }
 
@@ -445,9 +454,9 @@ Tensor *pow_t(Memory *mem, Tensor *a, float exponent) {
 
   for (int i = 0; i < a->numel; i++) {
     CHECK(!(a->data[i] < 0.0f && exponent != (int)exponent),
-           "pow_t: negative base with non-integer exponent");
+          "pow_t: negative base with non-integer exponent");
     CHECK(!(a->data[i] == 0.0f && exponent < 0.0f),
-           "pow_t: zero base with negative exponent");
+          "pow_t: zero base with negative exponent");
   }
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
@@ -555,7 +564,8 @@ static void backward_sum(Tensor *self) {
 }
 
 Tensor *sum_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "sum_t: a is NULL or dim out of bounds");
+  CHECK(a && dim >= 0 && dim < a->ndim,
+        "sum_t: a is NULL or dim out of bounds");
 
   int out_ndim;
   int shape[a->ndim];
@@ -652,9 +662,10 @@ static void backward_dot(Tensor *self) {
 }
 
 Tensor *dot_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->ndim == b->ndim && a->ndim == 1 &&
-            a->shape[0] == b->shape[0],
-         "dot_t: a is NULL, b is NULL, or tensors are not 1D with matching sizes");
+  CHECK(
+      a && b && a->ndim == b->ndim && a->ndim == 1 &&
+          a->shape[0] == b->shape[0],
+      "dot_t: a is NULL, b is NULL, or tensors are not 1D with matching sizes");
 
   int shape[] = {1};
   Tensor *r = tensor_zeros(mem, shape, 1, TEMP);
@@ -705,7 +716,8 @@ static void backward_max(Tensor *self) {
 }
 
 Tensor *max_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "max_t: a is NULL or dim out of bounds");
+  CHECK(a && dim >= 0 && dim < a->ndim,
+        "max_t: a is NULL or dim out of bounds");
   int out_ndim;
   int shape[a->ndim];
 
@@ -888,7 +900,8 @@ static void backward_mse(Tensor *self) {
 }
 
 Tensor *mseloss_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel, "mseloss_t: a is NULL, b is NULL, or tensor sizes do not match");
+  CHECK(a && b && a->numel == b->numel,
+        "mseloss_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   int shape[] = {1};
   Tensor *r = tensor_zeros(mem, shape, 1, TEMP);
@@ -937,7 +950,8 @@ static void backward_matmul(Tensor *self) {
 Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == b->ndim && a->ndim == 2 &&
             a->shape[1] == b->shape[0],
-         "matmul_t: a is NULL, b is NULL, or tensors are not compatible 2D matrices");
+        "matmul_t: a is NULL, b is NULL, or tensors are not compatible 2D "
+        "matrices");
   int result_shape[] = {a->shape[0], b->shape[1]};
   Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
 
@@ -1002,7 +1016,8 @@ static void backward_bmm(Tensor *self) {
 Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == 3 && b->ndim == 3 && a->shape[0] == b->shape[0] &&
             a->shape[2] == b->shape[1],
-         "bmm_t: a is NULL, b is NULL, or tensors are not compatible 3D batch matrices");
+        "bmm_t: a is NULL, b is NULL, or tensors are not compatible 3D batch "
+        "matrices");
 
   int B = a->shape[0];
   int T = a->shape[1];
@@ -1101,7 +1116,8 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
 }
 
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "squeeze_t: a is NULL or dim out of bounds");
+  CHECK(a && dim >= 0 && dim < a->ndim,
+        "squeeze_t: a is NULL or dim out of bounds");
 
   CHECK(a->shape[dim] == 1, "squeeze_t: dimension to squeeze must have size 1");
 
@@ -1116,7 +1132,8 @@ Tensor *squeeze_t(Memory *mem, Tensor *a, int dim) {
 }
 
 Tensor *unsqueeze_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim <= a->ndim, "unsqueeze_t: a is NULL or dim out of bounds");
+  CHECK(a && dim >= 0 && dim <= a->ndim,
+        "unsqueeze_t: a is NULL or dim out of bounds");
 
   int result_shape[a->ndim + 1];
   for (int i = 0, j = 0; i < a->ndim + 1; i++) {
@@ -1179,7 +1196,8 @@ for getting value from a->data Output index â†’ collapse broadcasted dims to 0 â
 read from input.
 */
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
-  CHECK(a && shape && tar_dim >= a->ndim, "broadcast_t: a is NULL, shape is NULL, or tar_dim < a->ndim");
+  CHECK(a && shape && tar_dim >= a->ndim,
+        "broadcast_t: a is NULL, shape is NULL, or tar_dim < a->ndim");
 
   int align_shape[tar_dim];
   for (int i = 0; i < tar_dim; i++) {
@@ -1269,7 +1287,7 @@ static void backward_crossentropy(Tensor *self) {
 
 Tensor *crossentropyloss_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(a && b && a->ndim == 2 && b->ndim == 1 && a->shape[0] == b->shape[0],
-         "crossentropyloss_t: a is NULL, b is NULL, or shapes are incompatible");
+        "crossentropyloss_t: a is NULL, b is NULL, or shapes are incompatible");
 
   int N = a->shape[0];
   int C = a->shape[1];
@@ -1307,7 +1325,8 @@ Tensor *crossentropyloss_t(Memory *mem, Tensor *a, Tensor *b) {
 }
 
 Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out) {
-  CHECK(d_out > 0 && d_in > 0, "create_linear: d_out and d_in must be positive");
+  CHECK(d_out > 0 && d_in > 0,
+        "create_linear: d_out and d_in must be positive");
   Linear *l = (Linear *)allocate_mem(mem, sizeof(Linear), PERM);
   CHECK(l, "create_linear: failed to allocate Linear struct");
 
@@ -1342,7 +1361,8 @@ Tensor *linear_t(Memory *mem, Linear *l, Tensor *x) {
 
 LayerNorm *create_layernorm(Memory *mem, ParameterList *pl,
                             int normalized_shape, float eps) {
-  CHECK(normalized_shape > 0, "create_layernorm: normalized_shape must be positive");
+  CHECK(normalized_shape > 0,
+        "create_layernorm: normalized_shape must be positive");
   LayerNorm *ln = (LayerNorm *)allocate_mem(mem, sizeof(LayerNorm), PERM);
   CHECK(ln, "create_layernorm: failed to allocate LayerNorm struct");
 
@@ -1413,7 +1433,7 @@ static void backward_mask(Tensor *self) {
 
 Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val) {
   CHECK(a && b && a->numel == b->numel && a->ndim == b->ndim,
-         "mask_t: a is NULL, b is NULL, or tensor sizes do not match");
+        "mask_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "mask_t: tensor_zeros failed");
@@ -1495,7 +1515,7 @@ static void backward_concat(Tensor *self) {
 
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim) {
   CHECK(a && b && dim >= 0 && a->ndim == b->ndim && dim < a->ndim,
-         "concat_t: a is NULL, b is NULL, dim out of bounds, or ndim mismatch");
+        "concat_t: a is NULL, b is NULL, dim out of bounds, or ndim mismatch");
 
   int out_shape[a->ndim];
 
@@ -1593,7 +1613,7 @@ static void backward_slice(Tensor *self) {
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size) {
   CHECK(a && dim >= 0 && dim < a->ndim && split_size <= a->shape[dim] &&
             split_size > 0,
-         "slice_t: a is NULL, dim out of bounds, or invalid split_size");
+        "slice_t: a is NULL, dim out of bounds, or invalid split_size");
   Pair_T *r = allocate_mem(mem, sizeof(Pair_T), TEMP);
   CHECK(r, "slice_t: result allocation failed");
 
@@ -1703,7 +1723,7 @@ static void backward_permute(Tensor *self) {
 
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   CHECK(a && dims && total_dim <= 4 && total_dim == a->ndim,
-         "permute_t: a is NULL, dims is NULL, or invalid dimensions");
+        "permute_t: a is NULL, dims is NULL, or invalid dimensions");
 
   int out_shape[a->ndim];
   for (int i = 0; i < a->ndim; i++) {
@@ -1779,7 +1799,8 @@ static void backward_softmax(Tensor *self) {
 }
 
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
-  CHECK(a && dim >= 0 && dim < a->ndim, "softmax_t: a is NULL or dim out of bounds");
+  CHECK(a && dim >= 0 && dim < a->ndim,
+        "softmax_t: a is NULL or dim out of bounds");
 
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "softmax_t: failed to create result tensor");
@@ -1848,7 +1869,7 @@ static void backward_embedding(Tensor *self) {
 // a is vocab
 Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
   CHECK(a && a->ndim == 2 && indices && indices->ndim == 2,
-         "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
+        "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
 
   int V = a->shape[0];
   int D = a->shape[1];
