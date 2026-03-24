@@ -615,33 +615,30 @@ Tensor *sum_t(Memory *mem, Tensor *a, int dim) {
 }
 
 static void backward_mean(Tensor *self) {
+  Tensor *r = self;
   Tensor *a = self->parents[0];
-
-  int dim = find_reduced_dim(a, self);
-  CHECK_VOID(dim >= 0, "backward_mean: could not determine reduced dimension");
-
+  int dim = self->op_params[0];
+  int out_dim = self->ndim;
   int R = a->shape[dim];
 
-  int outer = 1, inner = 1;
-  int reduce = a->shape[dim];
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int cord;
+    int a_idx = 0;
+    for (int d = out_dim - 1; d >= 0; d--) {
+      cord = curr % r->shape[d];
+      a_idx += cord * a->strides[(d < dim) ? d : d + 1];
+      curr /= r->shape[d];
+    }
 
-  for (int i = 0; i < dim; i++)
-    outer *= a->shape[i];
-
-  for (int i = dim + 1; i < a->ndim; i++)
-    inner *= a->shape[i];
-
-  for (int o = 0; o < outer; o++) {
-    int base = o * reduce * inner;
-    for (int i = 0; i < inner; i++) {
-      float grad = self->grad[o * inner + i];
-      for (int r = 0; r < reduce; r++) {
-        int idx = base + r * inner + i;
-        a->grad[idx] += (grad / R);
-      }
+    float g = r->grad[i];
+    for (int k = 0; k < R; k++) {
+      int final_idx = a_idx + k * a->strides[dim];
+      a->grad[final_idx] += g / R;
     }
   }
 }
+
 Tensor *mean_t(Memory *mem, Tensor *a, int dim) {
   Tensor *r = sum_t(mem, a, dim);
   CHECK(r, "mean_t: sum_t failed");

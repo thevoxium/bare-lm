@@ -6,5 +6,6 @@ gpt2.c
 .DS_Store
 check.c
 data/
+test/
 
 
