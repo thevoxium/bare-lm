@@ -254,6 +254,7 @@ float tensor_get(Tensor *t, int *indices) {
 
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm) {
   Tensor *t = tensor_init(mem, shape, ndim, perm);
+  memset(t->data, 0, t->numel);
   CHECK(t, "tensor_zeros: tensor_init failed");
   return t;
 }
@@ -953,16 +954,19 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
             a->shape[1] == b->shape[0],
         "matmul_t: a is NULL, b is NULL, or tensors are not compatible 2D "
         "matrices");
-  int result_shape[] = {a->shape[0], b->shape[1]};
+  int M = a->shape[0];
+  int N = a->shape[1];
+  int P = b->shape[1];
+
+  int result_shape[] = {M, P};
   Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
 
-  for (int i = 0; i < a->shape[0]; i++) {
-    for (int j = 0; j < b->shape[1]; j++) {
-      float sum = 0.0f;
-      for (int k = 0; k < a->shape[1]; k++) {
-        sum += (a->data[i * a->shape[1] + k] * b->data[k * b->shape[1] + j]);
+  for (int i = 0; i < M; i++) {
+    for (int k = 0; k < N; k++) {
+      float a_ik = a->data[i * N + k];
+      for (int j = 0; j < P; j++) {
+        r->data[i * P + j] += a_ik * b->data[k * P + j];
       }
-      r->data[i * result_shape[1] + j] = sum;
     }
   }
 
