@@ -1,4 +1,5 @@
 #include "bare.h"
+#include <math.h>
 #include <string.h>
 
 Memory *create_global_mem(size_t size) {
@@ -533,16 +534,6 @@ Tensor *log_t(Memory *mem, Tensor *a) {
   return r;
 }
 
-static int find_reduced_dim(Tensor *a, Tensor *out) {
-  for (int i = 0, j = 0; i < a->ndim; i++) {
-    if (j >= out->ndim || a->shape[i] != out->shape[j]) {
-      return i;
-    }
-    j++;
-  }
-  return -1;
-}
-
 static void backward_sum(Tensor *self) {
   Tensor *r = self;
   Tensor *a = self->parents[0];
@@ -682,38 +673,35 @@ Tensor *dot_t(Memory *mem, Tensor *a, Tensor *b) {
   return r;
 }
 
-static inline float max_f(float a, float b) { return a > b ? a : b; }
-static inline float min_f(float a, float b) { return a < b ? a : b; }
-
 static void backward_max(Tensor *self) {
   Tensor *a = self->parents[0];
-  int dim = find_reduced_dim(a, self);
-  int outer = 1, inner = 1;
-  int reduce = a->shape[dim];
+  Tensor *r = self;
+  int out_ndim = r->ndim;
+  int dim = self->op_params[0];
 
-  for (int i = 0; i < dim; i++)
-    outer *= a->shape[i];
+  int shape[a->ndim];
 
-  for (int i = dim + 1; i < a->ndim; i++)
-    inner *= a->shape[i];
-
-  for (int o = 0; o < outer; o++) {
-    int base = o * reduce * inner;
-    for (int i = 0; i < inner; i++) {
-      float grad = self->grad[o * inner + i];
-      float max_val = -INFINITY;
-      int max_r = 0;
-
-      for (int r = 0; r < reduce; r++) {
-        float v = a->data[base + r * inner + i];
-        if (v > max_val) {
-          max_val = v;
-          max_r = r;
-        }
-      }
-      int idx = base + max_r * inner + i;
-      a->grad[idx] += grad;
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int cord;
+    int a_idx = 0;
+    for (int d = out_ndim - 1; d >= 0; d--) {
+      cord = curr % r->shape[d];
+      a_idx += cord * a->strides[(d < dim) ? d : d + 1];
+      curr /= r->shape[d];
     }
+
+    float m = -INFINITY;
+    int m_idx = -1;
+    for (int k = 0; k < a->shape[dim]; k++) {
+      int final_idx = a_idx + k * a->strides[dim];
+      if (m < a->data[final_idx]) {
+        m = a->data[final_idx];
+        m_idx = final_idx;
+      }
+    }
+    if (m_idx != -1)
+      a->grad[m_idx] += r->grad[i];
   }
 }
 
@@ -736,30 +724,34 @@ Tensor *max_t(Memory *mem, Tensor *a, int dim) {
     out_ndim = a->ndim - 1;
   }
 
-  Tensor *out = tensor_init(mem, shape, out_ndim, TEMP);
-  CHECK(out, "max_t: failed to create output tensor");
+  Tensor *r = tensor_init(mem, shape, out_ndim, TEMP);
+  CHECK(r, "max_t: failed to create rput tensor");
 
-  int outer = 1, inner = 1, reduce = a->shape[dim];
-  for (int i = 0; i < dim; i++)
-    outer *= a->shape[i];
-  for (int i = dim + 1; i < a->ndim; i++)
-    inner *= a->shape[i];
-
-  for (int o = 0; o < outer; o++) {
-    for (int i = 0; i < inner; i++) {
-      float m = -INFINITY;
-      for (int r = 0; r < reduce; r++) {
-        m = max_f(m, a->data[o * reduce * inner + r * inner + i]);
-      }
-      out->data[o * inner + i] = m;
+  for (int i = 0; i < r->numel; i++) {
+    int curr = i;
+    int cord;
+    int a_idx = 0;
+    for (int d = out_ndim - 1; d >= 0; d--) {
+      cord = curr % r->shape[d];
+      a_idx += cord * a->strides[(d < dim) ? d : d + 1];
+      curr /= r->shape[d];
     }
+
+    float m = -INFINITY;
+    for (int k = 0; k < a->shape[dim]; k++) {
+      int final_idx = a_idx + k * a->strides[dim];
+      if (m < a->data[final_idx])
+        m = a->data[final_idx];
+    }
+    r->data[i] = m;
   }
 
-  out->parents[0] = a;
-  out->parents[1] = NULL;
-  out->op = MAX;
-  out->backward = backward_max;
-  return out;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op_params[0] = dim;
+  r->op = MAX;
+  r->backward = backward_max;
+  return r;
 }
 
 static void backward_relu(Tensor *self) {
@@ -1041,12 +1033,11 @@ Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
     float *r_data = r->data + bi * out_stride;
 
     for (int i = 0; i < T; i++) {
-      for (int j = 0; j < T; j++) {
-        float sum = 0.0f;
-        for (int k = 0; k < D; k++) {
-          sum += a_data[i * D + k] * b_data[k * T + j];
+      for (int k = 0; k < D; k++) {
+        float a_ik = a_data[i * D + k];
+        for (int j = 0; j < T; j++) {
+          r_data[i * D + j] += a_ik * b_data[k * D + j];
         }
-        r_data[i * T + j] = sum;
       }
     }
   }

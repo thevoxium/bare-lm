@@ -108,17 +108,17 @@ typedef struct Pair_T {
   Tensor *S;
 } Pair_T;
 
-typedef struct AdamW {
-  ParameterList *pl;
-  float lr;
-  float beta1;
-  float beta2;
-  float eps;
-  float weight_decay;
-  float **m;
-  float **v;
-  int t;
-} AdamW;
+// typedef struct AdamW {
+//   ParameterList *pl;
+//   float lr;
+//   float beta1;
+//   float beta2;
+//   float eps;
+//   float weight_decay;
+//   float **m;
+//   float **v;
+//   int t;
+// } AdamW;
 
 Memory *create_global_mem(size_t size);
 void reset_temp_mem(Memory *mem);
@@ -137,9 +137,6 @@ Tensor *linear_t(Memory *mem, Linear *l, Tensor *x);
 LayerNorm *create_layernorm(Memory *mem, ParameterList *pl,
                             int normalized_shape, float eps);
 Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x);
-
-void adamw_step(AdamW *adam, ParameterList *pl, float lr, float beta1,
-                float beta2, float eps, float weight_decay);
 
 void backward(Memory *mem, Tensor *root);
 
