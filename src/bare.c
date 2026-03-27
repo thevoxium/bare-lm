@@ -1516,10 +1516,10 @@ Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim) {
   int out_shape[a->ndim];
 
   for (int i = 0; i < a->ndim; i++) {
-    if (a->shape[i] != b->shape[i]) {
-      CHECK(i == dim, "concat_t: not compatible for concat");
+    if (i == dim) {
       out_shape[i] = a->shape[i] + b->shape[i];
     } else {
+      CHECK(a->shape[i] == b->shape[i], "concat_t: not compatible for concat");
       out_shape[i] = a->shape[i];
     }
   }
@@ -1607,7 +1607,7 @@ static void backward_slice(Tensor *self) {
 }
 
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size) {
-  CHECK(a && dim >= 0 && dim < a->ndim && split_size <= a->shape[dim] &&
+  CHECK(a && dim >= 0 && dim < a->ndim && split_size < a->shape[dim] &&
             split_size > 0,
         "slice_t: a is NULL, dim out of bounds, or invalid split_size");
   Pair_T *r = allocate_mem(mem, sizeof(Pair_T), TEMP);
