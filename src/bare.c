@@ -1867,7 +1867,6 @@ Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
   CHECK(a && a->ndim == 2 && indices && indices->ndim == 2,
         "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
 
-  int V = a->shape[0];
   int D = a->shape[1];
 
   int B = indices->shape[0];

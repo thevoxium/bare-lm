@@ -117,7 +117,6 @@ int main() {
   for (int i = 0; i < data->numel; i++) {
     data->data[i] = input_tokens[i];
   }
-  print_t(data, 0);
 
   Pair_T pt;
   get_batch(mem, &pt, data);
@@ -127,6 +126,31 @@ int main() {
 
   int B = x->shape[0];
   int T = x->shape[1];
+
+  // token_embeddings
+  int tok_shape[] = {vocab_size, config.n_embed};
+  Tensor *token_embedding_table = tensor_randn(mem, tok_shape, 2, PERM);
+  param_list_add(mem, pl, token_embedding_table);
+
+  // position_embeddings
+  int pos_shape[] = {config.block_size, config.n_embed};
+  Tensor *position_embedding_table = tensor_randn(mem, pos_shape, 2, PERM);
+  param_list_add(mem, pl, position_embedding_table);
+
+  // creaing position indices
+  int pos_index_shape[] = {1, T};
+  Tensor *pos_indices = tensor_zeros(mem, pos_index_shape, 2, PERM);
+  for (int i = 0; i < pos_indices->numel; i++) {
+    pos_indices->data[i] = i;
+  }
+
+  Tensor *tok_emb = embedding_t(mem, token_embedding_table, x);
+  Tensor *pos_emb = embedding_t(mem, position_embedding_table, pos_indices);
+
+  int pos_b_shape[] = {B, T, config.n_embed};
+  Tensor *pos_emb_b = broadcast_t(mem, pos_emb, pos_b_shape, 3);
+
+  Tensor *x_emb = add_t(mem, tok_emb, pos_emb_b);
 
   return 0;
 }
