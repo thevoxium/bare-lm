@@ -12,6 +12,7 @@ typedef struct Config {
   int n_embed;
   int max_iters;
   float lr;
+  int vocab_size;
 } Config;
 
 Config config = {
@@ -85,6 +86,136 @@ void get_batch(Memory *mem, Pair_T *pt, Tensor *data, int *char_to_idx) {
   return;
 }
 
+typedef struct ForwardResult {
+  Tensor *logits;
+} ForwardResult;
+
+ForwardResult forward(Memory *mem, Tensor *x, Tensor *token_embeddings,
+                      Tensor *position_embeddings, Tensor *Wq, Tensor *Wk,
+                      Tensor *Wv, Tensor *W1, Tensor *B1, Tensor *W2,
+                      Tensor *B2, Tensor *W_out, Tensor *B_out) {
+  ForwardResult result;
+
+  int B = x->shape[0];
+  int T = x->shape[1];
+  int C = config.n_embed;
+
+  int pos_index_shape[] = {1, T};
+  Tensor *pos_indices = tensor_zeros(mem, pos_index_shape, 2, PERM);
+  for (int i = 0; i < pos_indices->numel; i++) {
+    pos_indices->data[i] = i;
+  }
+  Tensor *tok_emb = embedding_t(mem, token_embeddings, x);
+  Tensor *pos_emb = embedding_t(mem, position_embeddings, pos_indices);
+  int pos_b_shape[] = {B, T, config.n_embed};
+
+  Tensor *pos_emb_b = broadcast_t(mem, pos_emb, pos_b_shape, 3);
+  Tensor *x_emb = add_t(mem, tok_emb, pos_emb_b);
+
+  Tensor *q = bmm_t(mem, x_emb, Wq);
+  Tensor *k = bmm_t(mem, x_emb, Wk);
+  Tensor *v = bmm_t(mem, x_emb, Wv);
+
+  int k_shape[] = {B, C, T};
+  Tensor *k_t = reshape_t(mem, k, k_shape, 3);
+
+  Tensor *scores = bmm_t(mem, q, k_t);
+  Tensor *scaled_scores = scale_t(mem, scores, 1 / pow(config.n_embed, 0.5));
+
+  int mask_shape[] = {B, T, T};
+  Tensor *causal_mask = tensor_zeros(mem, mask_shape, 3, TEMP);
+  for (int b = 0; b < B; b++) {
+    for (int i = 0; i < T; i++) {
+      for (int j = 0; j < T; j++) {
+        if (i < j) {
+          causal_mask->data[b * T * T + i * T + j] = 1.0f;
+        }
+      }
+    }
+  }
+  Tensor *masked_scores = mask_t(mem, scaled_scores, causal_mask, -INFINITY);
+  Tensor *weights = softmax_t(mem, masked_scores, 2);
+  Tensor *attn_out = bmm_t(mem, weights, v);
+
+  Tensor *ff1_w = bmm_t(mem, attn_out, W1);
+  int ff1_b_shape[] = {B, T, 4 * config.n_embed};
+  Tensor *B1_b = broadcast_t(mem, B1, ff1_b_shape, 3);
+  Tensor *ff1 = add_t(mem, ff1_w, B1_b);
+  Tensor *relu1 = relu_t(mem, ff1);
+
+  Tensor *ff2_w = bmm_t(mem, relu1, W2);
+  int ff2_b_shape[] = {B, T, config.n_embed};
+  Tensor *B2_b = broadcast_t(mem, B2, ff2_b_shape, 3);
+  Tensor *ff2 = add_t(mem, ff2_w, B2_b);
+
+  Tensor *logits_w = bmm_t(mem, ff2, W_out);
+  int logits_b_shape[] = {B, T, config.vocab_size};
+  Tensor *B_out_b = broadcast_t(mem, B_out, logits_b_shape, 3);
+  Tensor *logits = add_t(mem, logits_w, B_out_b);
+
+  result.logits = logits;
+  return result;
+}
+
+int *generate(Memory *mem, int *start_tokens, int start_len, int max_new_tokens,
+              Tensor *token_embeddings, Tensor *position_embeddings,
+              Tensor *Wq, Tensor *Wk, Tensor *Wv, Tensor *W1, Tensor *B1,
+              Tensor *W2, Tensor *B2, Tensor *W_out, Tensor *B_out) {
+  int *result = malloc((start_len + max_new_tokens) * sizeof(int));
+  for (int i = 0; i < start_len; i++) {
+    result[i] = start_tokens[i];
+  }
+
+  int current_len = start_len;
+
+  for (int iter = 0; iter < max_new_tokens; iter++) {
+    int seq_len = current_len;
+    if (seq_len > config.block_size) {
+      seq_len = config.block_size;
+    }
+
+    int idx_cond_len = seq_len;
+    int x_shape[] = {1, idx_cond_len};
+    Tensor *x = tensor_zeros(mem, x_shape, 2, PERM);
+    int start_offset = current_len - idx_cond_len;
+    for (int i = 0; i < idx_cond_len; i++) {
+      x->data[i] = result[start_offset + i];
+    }
+
+    ForwardResult fr = forward(mem, x, token_embeddings, position_embeddings,
+                               Wq, Wk, Wv, W1, B1, W2, B2, W_out, B_out);
+
+    int logits_shape[] = {1, idx_cond_len, config.vocab_size};
+    Tensor *logits = reshape_t(mem, fr.logits, logits_shape, 3);
+
+    int last_logits_shape[] = {1, config.vocab_size};
+    Tensor *last_logits = tensor_zeros(mem, last_logits_shape, 2, PERM);
+    for (int i = 0; i < config.vocab_size; i++) {
+      last_logits->data[i] = logits->data[(idx_cond_len - 1) * config.vocab_size + i];
+    }
+
+    Tensor *probs = softmax_t(mem, last_logits, 1);
+
+    float r = (float)rand() / RAND_MAX;
+    float cumsum = 0.0f;
+    int next_token = 0;
+    for (int i = 0; i < config.vocab_size; i++) {
+      cumsum += probs->data[i];
+      if (r <= cumsum) {
+        next_token = i;
+        break;
+      }
+    }
+
+    result[current_len] = next_token;
+    current_len++;
+
+    reset_temp_mem(mem);
+  }
+
+  return result;
+}
+
 int main() {
   srand(time(NULL));
   Memory *mem = create_global_mem(1 << 30);
@@ -120,6 +251,8 @@ int main() {
   }
 
   qsort(unique_chars, vocab_size, sizeof(char), cmp_char);
+
+  config.vocab_size = vocab_size;
 
   int char_to_idx[256] = {0};
   for (int i = 0; i < vocab_size; i++) {
@@ -221,67 +354,14 @@ int main() {
     Tensor *x = pt.F;
     Tensor *y = pt.S;
 
-    Pair_T result;
+    ForwardResult fr = forward(mem, x, token_embeddings, position_embeddings,
+                               Wq, Wk, Wv, W1, B1, W2, B2, W_out, B_out);
+    Tensor *logits = fr.logits;
 
-    int B = x->shape[0];    // 4
-    int T = x->shape[1];    // 8
-    int C = config.n_embed; // 32
+    int B = x->shape[0];
+    int T = x->shape[1];
 
-    int pos_index_shape[] = {1, T};
-    Tensor *pos_indices = tensor_zeros(mem, pos_index_shape, 2, PERM);
-    for (int i = 0; i < pos_indices->numel; i++) {
-      pos_indices->data[i] = i;
-    }
-    Tensor *tok_emb = embedding_t(mem, token_embeddings, x);
-    Tensor *pos_emb = embedding_t(mem, position_embeddings, pos_indices);
-    int pos_b_shape[] = {B, T, config.n_embed};
-
-    Tensor *pos_emb_b = broadcast_t(mem, pos_emb, pos_b_shape, 3);
-    Tensor *x_emb = add_t(mem, tok_emb, pos_emb_b);
-
-    Tensor *q = bmm_t(mem, x_emb, Wq);
-    Tensor *k = bmm_t(mem, x_emb, Wk);
-    Tensor *v = bmm_t(mem, x_emb, Wv);
-
-    int k_shape[] = {B, C, T};
-    Tensor *k_t = reshape_t(mem, k, k_shape, 3);
-
-    Tensor *scores = bmm_t(mem, q, k_t);
-    Tensor *scaled_scores = scale_t(mem, scores, 1 / pow(config.n_embed, 0.5));
-
-    int mask_shape[] = {B, T, T};
-    Tensor *causal_mask = tensor_zeros(mem, mask_shape, 3, TEMP);
-    for (int b = 0; b < B; b++) {
-      for (int i = 0; i < T; i++) {
-        for (int j = 0; j < T; j++) {
-          if (i < j) {
-            causal_mask->data[b * T * T + i * T + j] = 1.0f;
-          }
-        }
-      }
-    }
-    Tensor *masked_scores = mask_t(mem, scaled_scores, causal_mask, -INFINITY);
-    Tensor *weights = softmax_t(mem, masked_scores, 2);
-    Tensor *attn_out = bmm_t(mem, weights, v);
-    // print_t(W1, 0);
-
-    Tensor *ff1_w = bmm_t(mem, attn_out, W1);
-    int ff1_b_shape[] = {B, T, 4 * config.n_embed};
-    Tensor *B1_b = broadcast_t(mem, B1, ff1_b_shape, 3);
-    Tensor *ff1 = add_t(mem, ff1_w, B1_b);
-    Tensor *relu1 = relu_t(mem, ff1);
-
-    Tensor *ff2_w = bmm_t(mem, relu1, W2);
-    int ff2_b_shape[] = {B, T, config.n_embed};
-    Tensor *B2_b = broadcast_t(mem, B2, ff2_b_shape, 3);
-    Tensor *ff2 = add_t(mem, ff2_w, B2_b);
-
-    Tensor *logits_w = bmm_t(mem, ff2, W_out);
-    int logits_b_shape[] = {B, T, vocab_size};
-    Tensor *B_out_b = broadcast_t(mem, B_out, logits_b_shape, 3);
-    Tensor *logits = add_t(mem, logits_w, B_out_b);
-
-    int l_shape[] = {B * T, vocab_size};
+    int l_shape[] = {B * T, config.vocab_size};
     Tensor *logits_flat = reshape_t(mem, logits, l_shape, 2);
 
     int targets_flat_shape[] = {B * T};
@@ -296,6 +376,22 @@ int main() {
     sgd_step(pl, config.lr);
     print_t(loss, 0);
   }
+
+  int start_tokens[] = {0};
+  int start_len = 1;
+  int max_new_tokens = 100;
+
+  int *generated_tokens = generate(mem, start_tokens, start_len, max_new_tokens,
+                                   token_embeddings, position_embeddings, Wq,
+                                   Wk, Wv, W1, B1, W2, B2, W_out, B_out);
+
+  printf("Generated: ");
+  for (int i = 0; i < start_len + max_new_tokens; i++) {
+    putchar(unique_chars[generated_tokens[i]]);
+  }
+  printf("\n");
+
+  free(generated_tokens);
 
   free_global_mem(mem);
 
