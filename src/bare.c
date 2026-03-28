@@ -969,17 +969,59 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   return r;
 }
 
-static void backward_bmm(Tensor *self) {
+static void backward_bmm_3d_2d(Tensor *self) {
   Tensor *a = self->parents[0]; // (B, T, D)
-  Tensor *b = self->parents[1]; // (B, D, T)
+  Tensor *b = self->parents[1]; // (D, T)
 
   int B = a->shape[0];
   int T = a->shape[1];
   int D = a->shape[2];
+  int out_T = b->shape[1];
 
   int a_stride = T * D;
-  int b_stride = D * T;
-  int out_stride = T * T;
+  int out_stride = T * out_T;
+
+  for (int bi = 0; bi < B; bi++) {
+    float *a_data = a->data + bi * a_stride;
+    float *a_grad = a->grad + bi * a_stride;
+    float *b_data = b->data;
+    float *b_grad = b->grad;
+    float *self_grad = self->grad + bi * out_stride;
+
+    for (int i = 0; i < T; i++) {
+      for (int k = 0; k < D; k++) {
+        float sum = 0.0f;
+        for (int j = 0; j < out_T; j++) {
+          sum += self_grad[i * out_T + j] * b_data[k * out_T + j];
+        }
+        a_grad[i * D + k] += sum;
+      }
+    }
+
+    for (int k = 0; k < D; k++) {
+      for (int j = 0; j < out_T; j++) {
+        float sum = 0.0f;
+        for (int i = 0; i < T; i++) {
+          sum += a_data[i * D + k] * self_grad[i * out_T + j];
+        }
+        b_grad[k * out_T + j] += sum;
+      }
+    }
+  }
+}
+
+static void backward_bmm_3d_3d(Tensor *self) {
+  Tensor *a = self->parents[0]; // (B, T, D)
+  Tensor *b = self->parents[1]; // (B, D, out_D)
+
+  int B = a->shape[0];
+  int T = a->shape[1];
+  int D = a->shape[2];
+  int out_D = self->shape[2];
+
+  int a_stride = T * D;
+  int b_stride = D * out_D;
+  int out_stride = T * out_D;
 
   for (int bi = 0; bi < B; bi++) {
     float *a_data = a->data + bi * a_stride;
@@ -991,62 +1033,103 @@ static void backward_bmm(Tensor *self) {
     for (int i = 0; i < T; i++) {
       for (int k = 0; k < D; k++) {
         float sum = 0.0f;
-        for (int j = 0; j < T; j++) {
-          sum += self_grad[i * T + j] * b_data[k * T + j];
+        for (int j = 0; j < out_D; j++) {
+          sum += self_grad[i * out_D + j] * b_data[k * out_D + j];
         }
         a_grad[i * D + k] += sum;
       }
     }
 
     for (int k = 0; k < D; k++) {
-      for (int j = 0; j < T; j++) {
+      for (int j = 0; j < out_D; j++) {
         float sum = 0.0f;
         for (int i = 0; i < T; i++) {
-          sum += a_data[i * D + k] * self_grad[i * T + j];
+          sum += a_data[i * D + k] * self_grad[i * out_D + j];
         }
-        b_grad[k * T + j] += sum;
+        b_grad[k * out_D + j] += sum;
       }
     }
   }
 }
 
 Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->ndim == 3 && b->ndim == 3 && a->shape[0] == b->shape[0] &&
-            a->shape[2] == b->shape[1],
-        "bmm_t: a is NULL, b is NULL, or tensors are not compatible 3D batch "
-        "matrices");
+  CHECK(a && b, "bmm_t: a is NULL or b is NULL");
 
-  int B = a->shape[0];
-  int T = a->shape[1];
-  int D = a->shape[2];
+  if (a->ndim == 3 && b->ndim == 2) {
+    CHECK(a->shape[2] == b->shape[0],
+          "bmm_t: a is NULL, b is NULL, or tensors are not compatible");
 
-  int result_shape[] = {B, T, T};
-  Tensor *r = tensor_zeros(mem, result_shape, 3, TEMP);
+    int B = a->shape[0];
+    int T = a->shape[1];
+    int D = a->shape[2];
+    int out_T = b->shape[1];
 
-  int a_stride = T * D;
-  int b_stride = D * T;
-  int out_stride = T * T;
+    int result_shape[] = {B, T, out_T};
+    Tensor *r = tensor_zeros(mem, result_shape, 3, TEMP);
 
-  for (int bi = 0; bi < B; bi++) {
-    float *a_data = a->data + bi * a_stride;
-    float *b_data = b->data + bi * b_stride;
-    float *r_data = r->data + bi * out_stride;
+    int a_stride = T * D;
+    int out_stride = T * out_T;
 
-    for (int i = 0; i < T; i++) {
-      for (int k = 0; k < D; k++) {
-        float a_ik = a_data[i * D + k];
-        for (int j = 0; j < T; j++) {
-          r_data[i * D + j] += a_ik * b_data[k * D + j];
+    for (int bi = 0; bi < B; bi++) {
+      float *a_data = a->data + bi * a_stride;
+      float *b_data = b->data;
+      float *r_data = r->data + bi * out_stride;
+
+      for (int i = 0; i < T; i++) {
+        for (int k = 0; k < D; k++) {
+          float a_ik = a_data[i * D + k];
+          for (int j = 0; j < out_T; j++) {
+            r_data[i * out_T + j] += a_ik * b_data[k * out_T + j];
+          }
         }
       }
     }
+
+    r->op = BMM;
+    r->parents[0] = a;
+    r->parents[1] = b;
+    r->backward = backward_bmm_3d_2d;
+    return r;
+  } else if (a->ndim == 3 && b->ndim == 3) {
+    CHECK(a->shape[2] == b->shape[1],
+          "bmm_t: a is NULL, b is NULL, or tensors are not compatible");
+
+    int B = a->shape[0];
+    int T = a->shape[1];
+    int D = a->shape[2];
+    int out_D = b->shape[2];
+
+    int result_shape[] = {B, T, out_D};
+    Tensor *r = tensor_zeros(mem, result_shape, 3, TEMP);
+
+    int a_stride = T * D;
+    int b_stride = D * T;
+    int out_stride = T * T;
+
+    for (int bi = 0; bi < B; bi++) {
+      float *a_data = a->data + bi * a_stride;
+      float *b_data = b->data + bi * b_stride;
+      float *r_data = r->data + bi * out_stride;
+
+      for (int i = 0; i < T; i++) {
+        for (int k = 0; k < D; k++) {
+          float a_ik = a_data[i * D + k];
+          for (int j = 0; j < T; j++) {
+            r_data[i * T + j] += a_ik * b_data[k * T + j];
+          }
+        }
+      }
+    }
+
+    r->op = BMM;
+    r->parents[0] = a;
+    r->parents[1] = b;
+    r->backward = backward_bmm_3d_3d;
+    return r;
   }
 
-  r->op = BMM;
-  r->parents[0] = a;
-  r->parents[1] = b;
-  r->backward = backward_bmm;
-  return r;
+  CHECK(0, "bmm_t: unsupported tensor dimensions");
+  return NULL;
 }
 
 static void backward_transpose(Tensor *self) {
