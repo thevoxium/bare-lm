@@ -4,7 +4,7 @@
 #include <string.h>
 #include <time.h>
 
-#define MAX_ARRAY_LEN 512
+#define MAX_ARRAY_LEN 2000000
 
 typedef struct Config {
   int batch_size;
@@ -18,11 +18,25 @@ Config config = {
     .batch_size = 4,
     .block_size = 8,
     .n_embed = 32,
-    .max_iters = 500,
+    .max_iters = 5000,
     .lr = 1e-3,
 };
 
 int cmp_char(const void *a, const void *b) { return (*(char *)a - *(char *)b); }
+
+void clip_gradients(ParameterList *pl, float threshold) {
+  for (int i = 0; i < pl->count; i++) {
+    Tensor *t = pl->t[i];
+    for (int j = 0; j < t->numel; j++) {
+      float g = t->grad[j];
+      if (g > threshold) {
+        t->grad[j] = threshold;
+      } else if (g < -threshold) {
+        t->grad[j] = -threshold;
+      }
+    }
+  }
+}
 
 int encode(int *array, char *str) {
   int len = strlen(str);
@@ -46,7 +60,7 @@ char *decode(int *array, int len) {
   return str;
 }
 
-void get_batch(Memory *mem, Pair_T *pt, Tensor *data) {
+void get_batch(Memory *mem, Pair_T *pt, Tensor *data, int *char_to_idx) {
   int idx[config.batch_size];
   int N = data->numel - config.block_size - 1;
 
@@ -61,9 +75,10 @@ void get_batch(Memory *mem, Pair_T *pt, Tensor *data) {
   for (int i = 0; i < config.batch_size; i++) {
     int current_idx = idx[i];
     for (int j = 0; j < config.block_size; j++) {
-      pt->F->data[i * out_shape[1] + j] = 1.0f * data->data[current_idx + j];
+      pt->F->data[i * out_shape[1] + j] =
+          char_to_idx[(int)data->data[current_idx + j]];
       pt->S->data[i * out_shape[1] + j] =
-          1.0f * data->data[current_idx + j + 1];
+          char_to_idx[(int)data->data[current_idx + j + 1]];
     }
   }
 
@@ -75,7 +90,19 @@ int main() {
   Memory *mem = create_global_mem(1 << 30);
   ParameterList *pl = create_param_list(mem);
 
-  char text[] = "hello world, this is a tiny gpt";
+  FILE *fp = fopen("data/input.txt", "r");
+  if (!fp) {
+    printf("Error: Could not open data/input.txt\n");
+    return 1;
+  }
+  fseek(fp, 0, SEEK_END);
+  long file_size = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+  char *text = malloc(file_size + 1);
+  fread(text, 1, file_size, fp);
+  text[file_size] = '\0';
+  fclose(fp);
+
   int seen[256] = {0};
   int len = strlen(text);
 
@@ -94,11 +121,10 @@ int main() {
 
   qsort(unique_chars, vocab_size, sizeof(char), cmp_char);
 
-  // printf("Unique sorted chars:\n");
-  // for (int i = 0; i < vocab_size; i++) {
-  //   printf("%c ", unique_chars[i]);
-  // }
-  // printf("\nVocab size: %d\n", vocab_size);
+  int char_to_idx[256] = {0};
+  for (int i = 0; i < vocab_size; i++) {
+    char_to_idx[(unsigned char)unique_chars[i]] = i;
+  }
 
   int input_tokens[MAX_ARRAY_LEN];
   int input_tokens_len = encode(input_tokens, text);
@@ -190,7 +216,7 @@ int main() {
     zero_grad(pl);
 
     Pair_T pt;
-    get_batch(mem, &pt, data);
+    get_batch(mem, &pt, data, char_to_idx);
 
     Tensor *x = pt.F;
     Tensor *y = pt.S;
@@ -264,6 +290,8 @@ int main() {
     Tensor *loss = crossentropyloss_t(mem, logits_flat, targets_flat);
 
     backward(mem, loss);
+
+    clip_gradients(pl, 1.0f);
 
     sgd_step(pl, config.lr);
     print_t(loss, 0);
