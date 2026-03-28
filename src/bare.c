@@ -1466,25 +1466,53 @@ Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x) {
   int last_dim = x->ndim - 1;
 
   Tensor *mean = mean_t(mem, x, last_dim);
-  Tensor *mean_b = broadcast_t(mem, mean, x->shape, x->ndim);
-  Tensor *diff = sub_t(mem, x, mean_b);
+
+  int mean_b_shape[x->ndim];
+  for (int i = 0; i < x->ndim - 1; i++) {
+    mean_b_shape[i] = x->shape[i];
+  }
+  mean_b_shape[x->ndim - 1] = 1;
+  Tensor *mean_b = reshape_t(mem, mean, mean_b_shape, x->ndim);
+  Tensor *mean_bc = broadcast_t(mem, mean_b, x->shape, x->ndim);
+
+  Tensor *diff = sub_t(mem, x, mean_bc);
   Tensor *diff_sq = pow_t(mem, diff, 2.0f);
   Tensor *var = mean_t(mem, diff_sq, last_dim);
 
-  int var_shape[] = {var->shape[0]};
-
-  Tensor *eps_t = tensor_zeros(mem, var_shape, 1, TEMP);
+  Tensor *eps_t = tensor_zeros(mem, var->shape, var->ndim, TEMP);
   for (int i = 0; i < eps_t->numel; i++)
     eps_t->data[i] = ln->eps;
 
   Tensor *var_plus_eps = add_t(mem, var, eps_t);
   Tensor *std = pow_t(mem, var_plus_eps, 0.5f);
-  Tensor *std_b = broadcast_t(mem, std, x->shape, x->ndim);
-  Tensor *normed = divide_t(mem, diff, std_b);
-  Tensor *gamma_b = broadcast_t(mem, ln->weight, x->shape, x->ndim);
-  Tensor *out = mul_t(mem, gamma_b, normed);
-  Tensor *beta_b = broadcast_t(mem, ln->bias, x->shape, x->ndim);
-  out = add_t(mem, out, beta_b);
+
+  int std_b_shape[x->ndim];
+  for (int i = 0; i < x->ndim - 1; i++) {
+    std_b_shape[i] = x->shape[i];
+  }
+  std_b_shape[x->ndim - 1] = 1;
+  Tensor *std_b = reshape_t(mem, std, std_b_shape, x->ndim);
+  Tensor *std_bc = broadcast_t(mem, std_b, x->shape, x->ndim);
+
+  Tensor *normed = divide_t(mem, diff, std_bc);
+
+  int weight_b_shape[x->ndim];
+  for (int i = 0; i < x->ndim - 1; i++) {
+    weight_b_shape[i] = 1;
+  }
+  weight_b_shape[x->ndim - 1] = x->shape[x->ndim - 1];
+  Tensor *weight_b = reshape_t(mem, ln->weight, weight_b_shape, x->ndim);
+  Tensor *weight_bc = broadcast_t(mem, weight_b, x->shape, x->ndim);
+  Tensor *out = mul_t(mem, weight_bc, normed);
+
+  int bias_b_shape[x->ndim];
+  for (int i = 0; i < x->ndim - 1; i++) {
+    bias_b_shape[i] = 1;
+  }
+  bias_b_shape[x->ndim - 1] = x->shape[x->ndim - 1];
+  Tensor *bias_b = reshape_t(mem, ln->bias, bias_b_shape, x->ndim);
+  Tensor *bias_bc = broadcast_t(mem, bias_b, x->shape, x->ndim);
+  out = add_t(mem, out, bias_bc);
 
   return out;
 }
