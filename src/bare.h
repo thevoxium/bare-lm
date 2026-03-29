@@ -108,17 +108,19 @@ typedef struct Pair_T {
   Tensor *S;
 } Pair_T;
 
-// typedef struct AdamW {
-//   ParameterList *pl;
-//   float lr;
-//   float beta1;
-//   float beta2;
-//   float eps;
-//   float weight_decay;
-//   float **m;
-//   float **v;
-//   int t;
-// } AdamW;
+typedef struct Adam {
+  float lr;
+  float beta1;
+  float beta2;
+  float eps;
+  float **m;
+  float **v;
+  int t;
+} Adam;
+
+Adam *adam_init(Memory *mem, ParameterList *pl, float lr, float beta1,
+                float beta2, float eps, int t);
+void adam_step(Adam *optim, ParameterList *pl);
 
 Memory *create_global_mem(size_t size);
 void reset_temp_mem(Memory *mem);

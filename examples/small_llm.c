@@ -11,7 +11,6 @@ typedef struct Config {
   int block_size;
   int n_embed;
   int max_iters;
-  float lr;
   int vocab_size;
 } Config;
 
@@ -20,7 +19,6 @@ Config config = {
     .block_size = 64,
     .n_embed = 128,
     .max_iters = 1000,
-    .lr = 3e-4,
 };
 
 int cmp_char(const void *a, const void *b) { return (*(char *)a - *(char *)b); }
@@ -329,6 +327,8 @@ int main() {
   param_list_add(mem, pl, W_out);
   param_list_add(mem, pl, B_out);
 
+  Adam *optim = adam_init(mem, pl, 1e-3, 0.9, 0.999, 1e-8, 0);
+
   for (int i = 0; i < config.max_iters; i++) {
     printf("Step: %d \n", i);
     reset_temp_mem(mem);
@@ -360,7 +360,7 @@ int main() {
 
     clip_gradients(pl, 5.0f);
 
-    sgd_step(pl, config.lr);
+    adam_step(optim, pl);
     print_t(loss, 0);
   }
 

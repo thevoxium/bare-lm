@@ -2045,3 +2045,49 @@ void clip_gradients(ParameterList *pl, float threshold) {
     }
   }
 }
+
+Adam *adam_init(Memory *mem, ParameterList *pl, float lr, float beta1,
+                float beta2, float eps, int t) {
+  Adam *optim = allocate_mem(mem, sizeof(Adam), PERM);
+  CHECK(optim, "adam_init: allocate_mem failed");
+
+  optim->lr = lr;
+  optim->beta1 = beta1;
+  optim->beta2 = beta2;
+  optim->eps = eps;
+  optim->t = t;
+
+  optim->v = allocate_mem(mem, pl->count * sizeof(float *), PERM);
+  optim->m = allocate_mem(mem, pl->count * sizeof(float *), PERM);
+  CHECK(optim->v && optim->m, "adam_init: optim m or v allocation failed");
+  for (int i = 0; i < pl->count; i++) {
+    Tensor *t = pl->t[i];
+    optim->v[i] = allocate_mem(mem, t->numel * sizeof(float), PERM);
+    optim->m[i] = allocate_mem(mem, t->numel * sizeof(float), PERM);
+    CHECK(optim->v[i] && optim->m[i],
+          "adam_init: optim mi or vi allocation failed");
+    memset(optim->v[i], 0, t->numel * sizeof(float));
+    memset(optim->m[i], 0, t->numel * sizeof(float));
+  }
+
+  return optim;
+}
+
+void adam_step(Adam *optim, ParameterList *pl) {
+  optim->t += 1;
+  float lr_t = optim->lr * sqrtf(1.0f - powf(optim->beta2, optim->t)) /
+               (1.0f - powf(optim->beta1, optim->t));
+  for (int i = 0; i < pl->count; i++) {
+    Tensor *t = pl->t[i];
+    for (int j = 0; j < t->numel; j++) {
+      float grad = t->grad[j];
+      optim->m[i][j] =
+          optim->beta1 * optim->m[i][j] + (1.0f - optim->beta1) * grad;
+      optim->v[i][j] =
+          optim->beta2 * optim->v[i][j] + (1.0f - optim->beta2) * grad * grad;
+      float m_hat = optim->m[i][j] / (1.0f - powf(optim->beta1, optim->t));
+      float v_hat = optim->v[i][j] / (1.0f - powf(optim->beta2, optim->t));
+      t->data[j] -= lr_t * m_hat / (sqrtf(v_hat) + optim->eps);
+    }
+  }
+}
