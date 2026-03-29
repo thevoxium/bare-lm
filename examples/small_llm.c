@@ -17,7 +17,7 @@ typedef struct Config {
 Config config = {
     .batch_size = 4,
     .block_size = 64,
-    .n_embed = 128,
+    .n_embed = 256,
     .max_iters = 1000,
 };
 
@@ -327,7 +327,7 @@ int main() {
   param_list_add(mem, pl, W_out);
   param_list_add(mem, pl, B_out);
 
-  Adam *optim = adam_init(mem, pl, 1e-3, 0.9, 0.999, 1e-8, 0);
+  AdamW *optim = adamw_init(mem, pl, 3e-4, 0.9, 0.95, 1e-8, 0.01, 0);
 
   for (int i = 0; i < config.max_iters; i++) {
     printf("Step: %d \n", i);
@@ -360,7 +360,7 @@ int main() {
 
     clip_gradients(pl, 5.0f);
 
-    adam_step(optim, pl);
+    adamw_step(optim, pl);
     print_t(loss, 0);
   }
 

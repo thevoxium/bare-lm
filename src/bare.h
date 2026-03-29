@@ -118,9 +118,24 @@ typedef struct Adam {
   int t;
 } Adam;
 
+typedef struct AdamW {
+  float lr;
+  float beta1;
+  float beta2;
+  float eps;
+  float weight_decay;
+  float **m;
+  float **v;
+  int t;
+} AdamW;
+
 Adam *adam_init(Memory *mem, ParameterList *pl, float lr, float beta1,
                 float beta2, float eps, int t);
 void adam_step(Adam *optim, ParameterList *pl);
+
+AdamW *adamw_init(Memory *mem, ParameterList *pl, float lr, float beta1,
+                  float beta2, float eps, float weight_decay, int t);
+void adamw_step(AdamW *optim, ParameterList *pl);
 
 Memory *create_global_mem(size_t size);
 void reset_temp_mem(Memory *mem);
