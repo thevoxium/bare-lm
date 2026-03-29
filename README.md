@@ -167,6 +167,7 @@ sgd_step(pl, 0.01f); // update all parameters
 | `param_list_add` | `(Memory *mem, ParameterList *pl, Tensor *t)` | Add a tensor to the list |
 | `zero_grad` | `(ParameterList *pl)` | Zero gradients for all parameters |
 | `sgd_step` | `(ParameterList *pl, float lr)` | SGD update: `data -= lr * grad` |
+| `clip_gradients` | `(ParameterList *pl, float threshold)` | Clip gradients to [-threshold, threshold] |
 
 ### Tensor Creation
 
@@ -176,6 +177,7 @@ sgd_step(pl, 0.01f); // update all parameters
 | `tensor_zeros` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | Same as tensor_init |
 | `tensor_ones` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | All ones |
 | `tensor_randn` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | Random normal (Box-Muller) |
+| `tensor_xavier` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | Xavier initialization |
 | `tensor_get` | `(Tensor*, int *indices) → float` | Get element at multi-dim index |
 | `print_t` | `(Tensor*, uint8_t grad)` | Print tensor (grad=1 to include gradients) |
 
@@ -230,6 +232,12 @@ sgd_step(pl, 0.01f); // update all parameters
 | `bmm_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Batch matrix multiply (3D: [B,T,D] x [B,D,T] → [B,T,T]) |
 | `transpose_t` | `(Memory*, Tensor *a) → Tensor*` | Transpose 2D |
 | `dot_t` | `(Memory*, Tensor *a, Tensor *b) → Tensor*` | Dot product (1D) |
+
+### Embedding
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `embedding_t` | `(Memory*, Tensor *vocab, Tensor *indices) → Tensor*` | Look up embeddings (vocab: [V,D], indices: [B,T]) |
 
 ### Shape Operations
 
