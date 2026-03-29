@@ -144,6 +144,7 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_ones(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm);
+Tensor *tensor_xavier(Memory *mem, int *shape, int ndim, uint8_t perm);
 float tensor_get(Tensor *t, int *indices);
 void print_t(Tensor *t, uint8_t grad);
 void zero_grad(ParameterList *pl);

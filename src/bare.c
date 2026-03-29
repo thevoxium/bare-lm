@@ -291,6 +291,32 @@ Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm) {
   return t;
 }
 
+Tensor *tensor_xavier(Memory *mem, int *shape, int ndim, uint8_t perm) {
+  CHECK(ndim >= 2, "xavier_init: ndim < 2");
+  Tensor *r = tensor_randn(mem, shape, ndim, perm);
+  CHECK(r, "xavier_init: tensor_randn failed");
+
+  int f_in, f_out;
+  if (ndim == 2) {
+    f_in = shape[0];
+    f_out = shape[1];
+  } else {
+    int rf = 1;
+    for (int i = 2; i < ndim; i++) {
+      rf *= shape[i];
+    }
+    f_in = shape[0] * rf;
+    f_out = shape[1] * rf;
+  }
+
+  float scale = sqrtf(2.0f / (f_in + f_out));
+  for (int i = 0; i < r->numel; i++) {
+    r->data[i] *= scale;
+  }
+
+  return r;
+}
+
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];

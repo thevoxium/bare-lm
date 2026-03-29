@@ -17,22 +17,13 @@ typedef struct Config {
 
 Config config = {
     .batch_size = 4,
-    .block_size = 32,
+    .block_size = 64,
     .n_embed = 128,
-    .max_iters = 100000,
+    .max_iters = 1000,
     .lr = 3e-4,
 };
 
 int cmp_char(const void *a, const void *b) { return (*(char *)a - *(char *)b); }
-
-Tensor *xavier_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
-  float scale = sqrtf(2.0f / shape[0]);
-  Tensor *t = tensor_randn(mem, shape, ndim, perm);
-  for (int i = 0; i < t->numel; i++) {
-    t->data[i] *= scale;
-  }
-  return t;
-}
 
 int encode(int *array, char *str) {
   int len = strlen(str);
@@ -287,9 +278,9 @@ int main() {
   }
 
   int shape[] = {config.n_embed, config.n_embed};
-  Tensor *Wq = xavier_init(mem, shape, 2, PERM);
-  Tensor *Wk = xavier_init(mem, shape, 2, PERM);
-  Tensor *Wv = xavier_init(mem, shape, 2, PERM);
+  Tensor *Wq = tensor_xavier(mem, shape, 2, PERM);
+  Tensor *Wk = tensor_xavier(mem, shape, 2, PERM);
+  Tensor *Wv = tensor_xavier(mem, shape, 2, PERM);
 
   int qkv_bias_shape[] = {config.n_embed};
   Tensor *Bq = tensor_zeros(mem, qkv_bias_shape, 1, PERM);
@@ -297,28 +288,28 @@ int main() {
   Tensor *Bv = tensor_zeros(mem, qkv_bias_shape, 1, PERM);
 
   int shape2[] = {config.n_embed, 4 * config.n_embed};
-  Tensor *W1 = xavier_init(mem, shape2, 2, PERM);
+  Tensor *W1 = tensor_xavier(mem, shape2, 2, PERM);
 
   int shape3[] = {4 * config.n_embed};
   Tensor *B1 = tensor_zeros(mem, shape3, 1, PERM);
 
   int shape4[] = {4 * config.n_embed, config.n_embed};
-  Tensor *W2 = xavier_init(mem, shape4, 2, PERM);
+  Tensor *W2 = tensor_xavier(mem, shape4, 2, PERM);
 
   int shape5[] = {config.n_embed};
   Tensor *B2 = tensor_zeros(mem, shape5, 1, PERM);
 
   int shape6[] = {config.n_embed, vocab_size};
-  Tensor *W_out = xavier_init(mem, shape6, 2, PERM);
+  Tensor *W_out = tensor_xavier(mem, shape6, 2, PERM);
 
   int shape7[] = {vocab_size};
   Tensor *B_out = tensor_zeros(mem, shape7, 1, PERM);
 
   int shape8[] = {vocab_size, config.n_embed};
-  Tensor *token_embeddings = xavier_init(mem, shape8, 2, PERM);
+  Tensor *token_embeddings = tensor_xavier(mem, shape8, 2, PERM);
 
   int shape9[] = {config.block_size, config.n_embed};
-  Tensor *position_embeddings = xavier_init(mem, shape9, 2, PERM);
+  Tensor *position_embeddings = tensor_xavier(mem, shape9, 2, PERM);
 
   LayerNorm *ln1 = create_layernorm(mem, pl, config.n_embed, 1e-5);
   LayerNorm *ln2 = create_layernorm(mem, pl, config.n_embed, 1e-5);
