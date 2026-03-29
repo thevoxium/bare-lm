@@ -16,10 +16,10 @@ typedef struct Config {
 } Config;
 
 Config config = {
-    .batch_size = 64,
-    .block_size = 128,
-    .n_embed = 384,
-    .max_iters = 1000,
+    .batch_size = 4,
+    .block_size = 32,
+    .n_embed = 128,
+    .max_iters = 100000,
     .lr = 3e-4,
 };
 
@@ -32,20 +32,6 @@ Tensor *xavier_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
     t->data[i] *= scale;
   }
   return t;
-}
-
-void clip_gradients(ParameterList *pl, float threshold) {
-  for (int i = 0; i < pl->count; i++) {
-    Tensor *t = pl->t[i];
-    for (int j = 0; j < t->numel; j++) {
-      float g = t->grad[j];
-      if (g > threshold) {
-        t->grad[j] = threshold;
-      } else if (g < -threshold) {
-        t->grad[j] = -threshold;
-      }
-    }
-  }
 }
 
 int encode(int *array, char *str) {

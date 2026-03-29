@@ -182,5 +182,6 @@ Tensor *softmax_t(Memory *mem, Tensor *a, int dim);
 Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices);
 
 void sgd_step(ParameterList *pl, float lr);
+void clip_gradients(ParameterList *pl, float threshold);
 
 #endif //! BARE_H

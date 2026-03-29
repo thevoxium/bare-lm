@@ -2005,3 +2005,17 @@ Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
 
   return r;
 }
+
+void clip_gradients(ParameterList *pl, float threshold) {
+  for (int i = 0; i < pl->count; i++) {
+    Tensor *t = pl->t[i];
+    for (int j = 0; j < t->numel; j++) {
+      float g = t->grad[i];
+      if (g > threshold) {
+        t->grad[i] = threshold;
+      } else if (g < -threshold) {
+        t->grad[i] = -threshold;
+      }
+    }
+  }
+}
