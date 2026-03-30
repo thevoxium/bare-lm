@@ -15,10 +15,10 @@ typedef struct Config {
 } Config;
 
 Config config = {
-    .batch_size = 4,
+    .batch_size = 32,
     .block_size = 64,
-    .n_embed = 256,
-    .max_iters = 1000,
+    .n_embed = 128,
+    .max_iters = 20000,
 };
 
 int cmp_char(const void *a, const void *b) { return (*(char *)a - *(char *)b); }
