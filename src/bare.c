@@ -336,9 +336,13 @@ Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
 
   int N = r->numel;
 
+  float *__restrict__ r_data = r->data;
+  float *__restrict__ a_data = a->data;
+  float *__restrict__ b_data = b->data;
+
 #pragma omp parallel for
   for (int i = 0; i < N; i++) {
-    r->data[i] = a->data[i] + b->data[i];
+    r_data[i] = a_data[i] + b_data[i];
   }
 
   r->parents[0] = a;
@@ -367,8 +371,14 @@ Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(r, "sub_t: tensor_init failed");
 
   int N = r->numel;
+
+  float *__restrict__ r_data = r->data;
+  float *__restrict__ a_data = a->data;
+  float *__restrict__ b_data = b->data;
+
+#pragma omp parallel for
   for (int i = 0; i < N; i++) {
-    r->data[i] = a->data[i] - b->data[i];
+    r_data[i] = a_data[i] - b_data[i];
   }
 
   r->parents[0] = a;
@@ -398,8 +408,14 @@ Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(r, "mul_t: tensor_init failed");
 
   int N = r->numel;
+
+  float *__restrict__ r_data = r->data;
+  float *__restrict__ a_data = a->data;
+  float *__restrict__ b_data = b->data;
+
+#pragma omp parallel for
   for (int i = 0; i < N; i++) {
-    r->data[i] = a->data[i] * b->data[i];
+    r_data[i] = a_data[i] * b_data[i];
   }
 
   r->parents[0] = a;
