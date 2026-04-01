@@ -1008,11 +1008,15 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   int result_shape[] = {M, P};
   Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
 
+  float *__restrict__ r_data = r->data;
+  float *__restrict__ a_data = a->data;
+  float *__restrict__ b_data = b->data;
+
   for (int i = 0; i < M; i++) {
     for (int k = 0; k < N; k++) {
-      float a_ik = a->data[i * N + k];
+      float a_ik = a_data[i * N + k];
       for (int j = 0; j < P; j++) {
-        r->data[i * P + j] += a_ik * b->data[k * P + j];
+        r_data[i * P + j] += a_ik * b_data[k * P + j];
       }
     }
   }
