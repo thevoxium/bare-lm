@@ -1,12 +1,12 @@
-CC = gcc
-CFLAGS = -Wall -I./src -O3 -march=native -ffast-math
+CC = gcc-15
+CFLAGS = -Wall -I./src -O3 -march=native -ffast-math -fopenmp
 SANFLAGS = -fsanitize=address,undefined -fno-omit-frame-pointer -g
 SRCS = src/bare.c
 SRCS_TEST = test/test.c
-SRCS_TIMER = benchmark/timer.c
+SRCS_TIMER = benchmark/benchmark.c
 BUILD_DIR = build
 
-.PHONY: run time test asan clean
+.PHONY: run benchmark test asan clean
 
 run:
 	@mkdir -p $(BUILD_DIR)
@@ -18,7 +18,7 @@ test:
 	$(CC) $(CFLAGS) $(SRCS) $(SRCS_TEST) -o $(BUILD_DIR)/test
 	./$(BUILD_DIR)/test
 
-time:
+benchmark:
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(SRCS) $(SRCS_TIMER) -o $(BUILD_DIR)/timer
 	./$(BUILD_DIR)/timer

@@ -335,6 +335,8 @@ Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
   CHECK(r, "add_t: tensor_init failed");
 
   int N = r->numel;
+
+#pragma omp parallel for
   for (int i = 0; i < N; i++) {
     r->data[i] = a->data[i] + b->data[i];
   }
