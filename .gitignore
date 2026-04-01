@@ -7,5 +7,5 @@ gpt2.c
 check.c
 data/
 test/
-
+compile_commands.json
 

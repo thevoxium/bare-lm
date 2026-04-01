@@ -1,4 +1,5 @@
 #include "bare.h"
+#include <cblas.h>
 #include <math.h>
 #include <string.h>
 
@@ -970,34 +971,20 @@ Tensor *mseloss_t(Memory *mem, Tensor *a, Tensor *b) {
 }
 
 static void backward_matmul(Tensor *self) {
-  Tensor *a = self->parents[0]; // (m, n)
-  Tensor *b = self->parents[1]; // (n, p)
+  Tensor *a = self->parents[0]; // (M, K)
+  Tensor *b = self->parents[1]; // (K, N)
 
-  int m = a->shape[0];
-  int n = a->shape[1];
-  int p = b->shape[1];
+  int M = a->shape[0];
+  int K = a->shape[1];
+  int N = b->shape[1];
 
-  // dA = dC @ B^T
-  for (int i = 0; i < m; i++) {
-    for (int k = 0; k < n; k++) {
-      float sum = 0.0f;
-      for (int j = 0; j < p; j++) {
-        sum += self->grad[i * p + j] * b->data[k * p + j]; // B[k,j]
-      }
-      a->grad[i * n + k] += sum;
-    }
-  }
+  // dA = dC @ B^T  -> (M, N) @ (N, K) = (M, K)
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, M, K, N, 1.0f,
+              self->grad, N, b->data, N, 1.0f, a->grad, K);
 
-  // dB = A^T @ dC
-  for (int k = 0; k < n; k++) {
-    for (int j = 0; j < p; j++) {
-      float sum = 0.0f;
-      for (int i = 0; i < m; i++) {
-        sum += a->data[i * n + k] * self->grad[i * p + j];
-      }
-      b->grad[k * p + j] += sum;
-    }
-  }
+  // dB = A^T @ dC  -> (K, M) @ (M, N) = (K, N)
+  cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, K, N, M, 1.0f, a->data,
+              K, self->grad, N, 1.0f, b->grad, N);
 }
 
 Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
@@ -1006,24 +993,18 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
         "matmul_t: a is NULL, b is NULL, or tensors are not compatible 2D "
         "matrices");
   int M = a->shape[0];
-  int N = a->shape[1];
-  int P = b->shape[1];
+  int K = a->shape[1];
+  int N = b->shape[1];
 
-  int result_shape[] = {M, P};
+  int result_shape[] = {M, N};
   Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
 
   float *__restrict__ r_data = r->data;
   float *__restrict__ a_data = a->data;
   float *__restrict__ b_data = b->data;
 
-  for (int i = 0; i < M; i++) {
-    for (int k = 0; k < N; k++) {
-      float a_ik = a_data[i * N + k];
-      for (int j = 0; j < P; j++) {
-        r_data[i * P + j] += a_ik * b_data[k * P + j];
-      }
-    }
-  }
+  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, a_data,
+              K, b_data, N, 0.0f, r_data, N);
 
   r->op = MATMUL;
   r->parents[0] = a;
