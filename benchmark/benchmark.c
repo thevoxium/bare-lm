@@ -21,97 +21,46 @@ static double timer_stop(Timer *t) {
 
 Timer t;
 
-static void run_add_t(Memory *mem) {
-  int N = 1000000;
+typedef Tensor *(*BinaryOp)(Memory *, Tensor *, Tensor *);
+typedef Tensor *(*UnaryOp)(Memory *, Tensor *);
+
+static double run_binary_benchmark(Memory *mem, const char *name, int N, BinaryOp op) {
   double total_time = 0.0f;
   for (int i = 0; i < ITER; i++) {
     reset_temp_mem(mem);
-    int shape_a[] = {N};
-    int shape_b[] = {N};
-    Tensor *a = tensor_randn(mem, shape_a, 1, TEMP);
-    Tensor *b = tensor_randn(mem, shape_b, 1, TEMP);
+    int shape[] = {N};
+    Tensor *a = tensor_randn(mem, shape, 1, TEMP);
+    Tensor *b = tensor_randn(mem, shape, 1, TEMP);
     timer_start(&t);
-    volatile Tensor *r = add_t(mem, a, b);
-    double elapsed = timer_stop(&t);
-    total_time += elapsed;
+    volatile Tensor *r = op(mem, a, b);
+    total_time += timer_stop(&t);
   }
-  PRINT_TIME("add_t", N, total_time / ITER);
+  PRINT_TIME(name, N, total_time / ITER);
+  return total_time / ITER;
 }
 
-static void run_sub_t(Memory *mem) {
-  int N = 1000000;
+static double run_unary_benchmark(Memory *mem, const char *name, int N, UnaryOp op) {
   double total_time = 0.0f;
   for (int i = 0; i < ITER; i++) {
     reset_temp_mem(mem);
-    int shape_a[] = {N};
-    int shape_b[] = {N};
-    Tensor *a = tensor_randn(mem, shape_a, 1, TEMP);
-    Tensor *b = tensor_randn(mem, shape_b, 1, TEMP);
+    int shape[] = {N};
+    Tensor *a = tensor_randn(mem, shape, 1, TEMP);
     timer_start(&t);
-    volatile Tensor *r = sub_t(mem, a, b);
-    double elapsed = timer_stop(&t);
-    total_time += elapsed;
+    volatile Tensor *r = op(mem, a);
+    total_time += timer_stop(&t);
   }
-  PRINT_TIME("sub_t", N, total_time / ITER);
-}
-
-static void run_mul_t(Memory *mem) {
-  int N = 1000000;
-  double total_time = 0.0f;
-  for (int i = 0; i < ITER; i++) {
-    reset_temp_mem(mem);
-    int shape_a[] = {N};
-    int shape_b[] = {N};
-    Tensor *a = tensor_randn(mem, shape_a, 1, TEMP);
-    Tensor *b = tensor_randn(mem, shape_b, 1, TEMP);
-    timer_start(&t);
-    volatile Tensor *r = mul_t(mem, a, b);
-    double elapsed = timer_stop(&t);
-    total_time += elapsed;
-  }
-  PRINT_TIME("mul_t", N, total_time / ITER);
-}
-
-static void run_divide_t(Memory *mem) {
-  int N = 1000000;
-  double total_time = 0.0f;
-  for (int i = 0; i < ITER; i++) {
-    reset_temp_mem(mem);
-    int shape_a[] = {N};
-    int shape_b[] = {N};
-    Tensor *a = tensor_randn(mem, shape_a, 1, TEMP);
-    Tensor *b = tensor_randn(mem, shape_b, 1, TEMP);
-    timer_start(&t);
-    volatile Tensor *r = divide_t(mem, a, b);
-    double elapsed = timer_stop(&t);
-    total_time += elapsed;
-  }
-  PRINT_TIME("divide_t", N, total_time / ITER);
-}
-
-static void run_neg_t(Memory *mem) {
-  int N = 1000000;
-  double total_time = 0.0f;
-  for (int i = 0; i < ITER; i++) {
-    reset_temp_mem(mem);
-    int shape_a[] = {N};
-    Tensor *a = tensor_randn(mem, shape_a, 1, TEMP);
-    timer_start(&t);
-    volatile Tensor *r = neg_t(mem, a);
-    double elapsed = timer_stop(&t);
-    total_time += elapsed;
-  }
-  PRINT_TIME("neg_t", N, total_time / ITER);
+  PRINT_TIME(name, N, total_time / ITER);
+  return total_time / ITER;
 }
 
 int main(void) {
   Memory *mem = create_global_mem(1UL << 32);
 
-  run_add_t(mem);
-  run_sub_t(mem);
-  run_mul_t(mem);
-  run_divide_t(mem);
-  run_neg_t(mem);
+  run_binary_benchmark(mem, "add_t", 1000000, add_t);
+  run_binary_benchmark(mem, "sub_t", 1000000, sub_t);
+  run_binary_benchmark(mem, "mul_t", 1000000, mul_t);
+  run_binary_benchmark(mem, "divide_t", 1000000, divide_t);
+  run_unary_benchmark(mem, "neg_t", 1000000, neg_t);
 
   free_global_mem(mem);
   return 0;
