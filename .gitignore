@@ -8,4 +8,6 @@ check.c
 data/
 test/
 compile_commands.json
+.cache/
+.cache*
 
