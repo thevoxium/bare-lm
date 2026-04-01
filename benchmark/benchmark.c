@@ -58,12 +58,13 @@ static double run_unary_benchmark(Memory *mem, const char *name, int N,
 int main(void) {
   Memory *mem = create_global_mem(1UL << 32);
 
-  run_binary_benchmark(mem, "matmul_t", 1024, matmul_t);
-  run_binary_benchmark(mem, "add_t", 1000, add_t);
-  run_binary_benchmark(mem, "sub_t", 1000, sub_t);
-  run_binary_benchmark(mem, "mul_t", 1000, mul_t);
-  run_binary_benchmark(mem, "divide_t", 1000, divide_t);
-  run_unary_benchmark(mem, "neg_t", 1000, neg_t);
+  // run_binary_benchmark(mem, "matmul_t", 1024, matmul_t);
+  // run_binary_benchmark(mem, "add_t", 1000, add_t);
+  // run_binary_benchmark(mem, "sub_t", 1000, sub_t);
+  // run_binary_benchmark(mem, "mul_t", 1000, mul_t);
+  // run_binary_benchmark(mem, "divide_t", 1000, divide_t);
+  // run_unary_benchmark(mem, "neg_t", 1000, neg_t);
+  run_unary_benchmark(mem, "relu_t", 1000000, relu_t);
 
   free_global_mem(mem);
   return 0;

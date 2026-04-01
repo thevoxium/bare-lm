@@ -823,8 +823,12 @@ Tensor *relu_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "relu_t: tensor_init failed");
 
+  float *__restrict__ r_data = r->data;
+  float *__restrict__ a_data = a->data;
+
+#pragma omp parallel for
   for (int i = 0; i < r->numel; i++) {
-    r->data[i] = a->data[i] > 0.0f ? a->data[i] : 0.0f;
+    r_data[i] = a_data[i] > 0.0f ? a_data[i] : 0.0f;
   }
 
   r->parents[0] = a;
