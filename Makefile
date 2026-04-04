@@ -1,4 +1,4 @@
-CC = gcc-15
+CC ?= gcc-15
 SANFLAGS = -fsanitize=address,undefined -fno-omit-frame-pointer -g
 SRCS = src/bare.c
 SRCS_TEST = test/test.c
@@ -7,7 +7,7 @@ BUILD_DIR = build
 OPENBLAS_PATH = /opt/homebrew/opt/openblas
 CFLAGS = -Wall -I./src -O3 -march=native -ffast-math -fopenmp \
          -I$(OPENBLAS_PATH)/include
-LDFLAGS = -L$(OPENBLAS_PATH)/lib -lopenblas
+LDFLAGS = -L$(OPENBLAS_PATH)/lib -lopenblas -lm
 
 .PHONY: run benchmark test asan clean
 
