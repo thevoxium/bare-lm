@@ -100,16 +100,22 @@ ForwardResult forward(Memory *mem, Tensor *x, Tensor *token_embeddings,
 
   Tensor *x_norm = layernorm_t(mem, ln1, x_emb);
 
-  Tensor *q = bmm_t(mem, x_norm, Wq);
+  int Wq_b_shape[] = {B, C, C};
+  Tensor *Wq_b = broadcast_t(mem, Wq, Wq_b_shape, 3);
+  Tensor *q = bmm_t(mem, x_norm, Wq_b);
   int q_b_shape[] = {B, T, config.n_embed};
   Tensor *Bq_b = broadcast_t(mem, Bq, q_b_shape, 3);
   q = add_t(mem, q, Bq_b);
 
-  Tensor *k = bmm_t(mem, x_norm, Wk);
+  int Wk_b_shape[] = {B, C, C};
+  Tensor *Wk_b = broadcast_t(mem, Wk, Wk_b_shape, 3);
+  Tensor *k = bmm_t(mem, x_norm, Wk_b);
   Tensor *Bk_b = broadcast_t(mem, Bk, q_b_shape, 3);
   k = add_t(mem, k, Bk_b);
 
-  Tensor *v = bmm_t(mem, x_norm, Wv);
+  int Wv_b_shape[] = {B, C, C};
+  Tensor *Wv_b = broadcast_t(mem, Wv, Wv_b_shape, 3);
+  Tensor *v = bmm_t(mem, x_norm, Wv_b);
   Tensor *Bv_b = broadcast_t(mem, Bv, q_b_shape, 3);
   v = add_t(mem, v, Bv_b);
 
@@ -136,13 +142,17 @@ ForwardResult forward(Memory *mem, Tensor *x, Tensor *token_embeddings,
 
   Tensor *attn_residual = add_t(mem, x_emb, attn_out);
 
-  Tensor *ff1_w = bmm_t(mem, attn_residual, W1);
+  int W1_b_shape[] = {B, C, 4 * config.n_embed};
+  Tensor *W1_b = broadcast_t(mem, W1, W1_b_shape, 3);
+  Tensor *ff1_w = bmm_t(mem, attn_residual, W1_b);
   int ff1_b_shape[] = {B, T, 4 * config.n_embed};
   Tensor *B1_b = broadcast_t(mem, B1, ff1_b_shape, 3);
   Tensor *ff1 = add_t(mem, ff1_w, B1_b);
   Tensor *relu1 = relu_t(mem, ff1);
 
-  Tensor *ff2_w = bmm_t(mem, relu1, W2);
+  int W2_b_shape[] = {B, 4 * config.n_embed, C};
+  Tensor *W2_b = broadcast_t(mem, W2, W2_b_shape, 3);
+  Tensor *ff2_w = bmm_t(mem, relu1, W2_b);
   int ff2_b_shape[] = {B, T, config.n_embed};
   Tensor *B2_b = broadcast_t(mem, B2, ff2_b_shape, 3);
   Tensor *ff2 = add_t(mem, ff2_w, B2_b);
@@ -151,7 +161,9 @@ ForwardResult forward(Memory *mem, Tensor *x, Tensor *token_embeddings,
 
   Tensor *x_norm2 = layernorm_t(mem, ln2, ff_residual);
 
-  Tensor *logits_w = bmm_t(mem, x_norm2, W_out);
+  int W_out_b_shape[] = {B, C, config.vocab_size};
+  Tensor *W_out_b = broadcast_t(mem, W_out, W_out_b_shape, 3);
+  Tensor *logits_w = bmm_t(mem, x_norm2, W_out_b);
   int logits_b_shape[] = {B, T, config.vocab_size};
   Tensor *B_out_b = broadcast_t(mem, B_out, logits_b_shape, 3);
   Tensor *logits = add_t(mem, logits_w, B_out_b);
