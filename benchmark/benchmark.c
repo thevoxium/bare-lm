@@ -17,7 +17,7 @@ static double run_binary_benchmark(Memory *mem, const char *name, int N,
     volatile Tensor *r = op(mem, a, b);
     total_time += timer_stop(&t);
   }
-  PRINT_TIME(name, N, total_time / ITER);
+  PRINT_TIME(name, (size_t)N, total_time / ITER);
   return total_time / ITER;
 }
 
@@ -32,7 +32,7 @@ static double run_unary_benchmark(Memory *mem, const char *name, int N,
     volatile Tensor *r = op(mem, a);
     total_time += timer_stop(&t);
   }
-  PRINT_TIME(name, N, total_time / ITER);
+  PRINT_TIME(name, (size_t)N, total_time / ITER);
   return total_time / ITER;
 }
 
