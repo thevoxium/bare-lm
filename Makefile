@@ -6,6 +6,8 @@ BUILD_DIR = build
 OPENBLAS_PATH = /opt/homebrew/opt/openblas
 CFLAGS = -Wall -I./src -O3 -march=native -ffast-math -fopenmp \
          -I$(OPENBLAS_PATH)/include
+VALGRIND = -Wall -I./src -O0 -march=native -ffast-math -fopenmp \
+         -I$(OPENBLAS_PATH)/include
 ifeq ($(perf),1)
 CFLAGS += -g -fno-omit-frame-pointer 
 endif
@@ -28,6 +30,10 @@ time:
 	$(CC) $(CFLAGS) $(SRCS) $(file) $(LDFLAGS) -o $(BUILD_DIR)/$(basename $(notdir $(file)))
 	./$(BUILD_DIR)/$(basename $(notdir $(file)))
 
+valgrind:
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(VALGRIND) $(SRCS) $(file) $(LDFLAGS) -o $(BUILD_DIR)/$(basename $(notdir $(file)))
+	./$(BUILD_DIR)/$(basename $(notdir $(file)))
 
 asan:
 	@mkdir -p $(BUILD_DIR)
