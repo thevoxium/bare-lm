@@ -1,3 +1,4 @@
+// OPENBLAS_NUM_THREADS=1 perf record -g --call-graph dwarf build/small_llm
 #include "../src/bare.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +19,7 @@ Config config = {
     .batch_size = 32,
     .block_size = 64,
     .n_embed = 128,
-    .max_iters = 20000,
+    .max_iters = 10,
 };
 
 int cmp_char(const void *a, const void *b) { return (*(char *)a - *(char *)b); }

@@ -10,4 +10,5 @@ test/
 compile_commands.json
 .cache/
 .cache*
+perf*
 

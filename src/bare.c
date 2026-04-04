@@ -341,7 +341,6 @@ Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
   float *__restrict__ a_data = a->data;
   float *__restrict__ b_data = b->data;
 
-#pragma omp parallel for
   for (int i = 0; i < N; i++) {
     r_data[i] = a_data[i] + b_data[i];
   }
@@ -377,7 +376,6 @@ Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
   float *__restrict__ a_data = a->data;
   float *__restrict__ b_data = b->data;
 
-#pragma omp parallel for
   for (int i = 0; i < N; i++) {
     r_data[i] = a_data[i] - b_data[i];
   }
@@ -414,7 +412,6 @@ Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
   float *__restrict__ a_data = a->data;
   float *__restrict__ b_data = b->data;
 
-#pragma omp parallel for
   for (int i = 0; i < N; i++) {
     r_data[i] = a_data[i] * b_data[i];
   }
@@ -451,7 +448,6 @@ Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
   float *__restrict__ a_data = a->data;
   float *__restrict__ b_data = b->data;
 
-#pragma omp parallel for
   for (int i = 0; i < N; i++) {
     r_data[i] = a_data[i] / b_data[i];
   }
@@ -484,7 +480,6 @@ Tensor *neg_t(Memory *mem, Tensor *a) {
   float *__restrict__ r_data = r->data;
   float *__restrict__ a_data = a->data;
 
-#pragma omp parallel for
   for (int i = 0; i < N; i++) {
     r_data[i] = -a_data[i];
   }
@@ -827,7 +822,6 @@ Tensor *relu_t(Memory *mem, Tensor *a) {
   float *__restrict__ r_data = r->data;
   float *__restrict__ a_data = a->data;
 
-#pragma omp parallel for
   for (int i = 0; i < r->numel; i++) {
     r_data[i] = a_data[i] > 0.0f ? a_data[i] : 0.0f;
   }
@@ -1011,47 +1005,6 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
   r->parents[1] = b;
   r->backward = backward_matmul;
   return r;
-}
-
-static void backward_bmm_3d_2d(Tensor *self) {
-  Tensor *a = self->parents[0]; // (B, T, D)
-  Tensor *b = self->parents[1]; // (D, T)
-
-  int B = a->shape[0];
-  int T = a->shape[1];
-  int D = a->shape[2];
-  int out_T = b->shape[1];
-
-  int a_stride = T * D;
-  int out_stride = T * out_T;
-
-  for (int bi = 0; bi < B; bi++) {
-    float *a_data = a->data + bi * a_stride;
-    float *a_grad = a->grad + bi * a_stride;
-    float *b_data = b->data;
-    float *b_grad = b->grad;
-    float *self_grad = self->grad + bi * out_stride;
-
-    for (int i = 0; i < T; i++) {
-      for (int k = 0; k < D; k++) {
-        float sum = 0.0f;
-        for (int j = 0; j < out_T; j++) {
-          sum += self_grad[i * out_T + j] * b_data[k * out_T + j];
-        }
-        a_grad[i * D + k] += sum;
-      }
-    }
-
-    for (int k = 0; k < D; k++) {
-      for (int j = 0; j < out_T; j++) {
-        float sum = 0.0f;
-        for (int i = 0; i < T; i++) {
-          sum += a_data[i * D + k] * self_grad[i * out_T + j];
-        }
-        b_grad[k * out_T + j] += sum;
-      }
-    }
-  }
 }
 
 static void backward_bmm(Tensor *self) {
@@ -1252,6 +1205,7 @@ static void backward_broadcast(Tensor *self) {
   }
 }
 
+// OLD LOGIC BELOW
 /*
 1. Right-align input shape with target shape by padding leading 1s.
 2. For each output index, compute its multi-dimensional index.
