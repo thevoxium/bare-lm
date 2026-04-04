@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#define PRINT_TIME(S, N, T) printf("%s, N = %d, time -> %.3f ms\n", S, N, T);
+#define PRINT_TIME(S, N, T) printf("%s, N = %zu, time -> %.3f ms\n", S, N, T);
 #define ITER 100
 
 typedef struct Timer {
