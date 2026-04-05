@@ -1,18 +1,18 @@
 #include "bare.h"
 #include <cblas.h>
-#include <math.h>
-#include <string.h>
 
 Memory *create_global_mem(size_t size) {
   Memory *mem = (Memory *)malloc(sizeof(Memory));
   CHECK(mem, "create_global_mem: failed to allocate Memory struct");
 
+  size = (size + ALIGNMENT - 1) & (~(ALIGNMENT - 1));
+
   mem->perm = (Arena *)malloc(sizeof(Arena));
   mem->temp = (Arena *)malloc(sizeof(Arena));
   CHECK(mem->perm && mem->temp, "create_global_mem: could not create arenas");
 
-  mem->perm->buffer = (uint8_t *)malloc(size);
-  mem->temp->buffer = (uint8_t *)malloc(size);
+  mem->perm->buffer = (uint8_t *)aligned_alloc(ALIGNMENT, size);
+  mem->temp->buffer = (uint8_t *)aligned_alloc(ALIGNMENT, size);
   CHECK(mem->perm->buffer && mem->temp->buffer,
         "create_global_mem: error allocating buffer");
 
@@ -31,19 +31,14 @@ void reset_temp_mem(Memory *mem) {
 
 void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
   CHECK(mem && size > 0, "allocate_mem: mem is NULL or size is 0");
-  size = (size + 7) & ~7;
   void *ptr = NULL;
-  if (perm) {
-    CHECK(mem->perm->used + size <= mem->perm->size,
-          "allocate_mem: not enough memory");
-    ptr = mem->perm->buffer + mem->perm->used;
-    mem->perm->used += size;
-  } else {
-    CHECK(mem->temp->used + size <= mem->temp->size,
-          "allocate_mem: not enough memory");
-    ptr = mem->temp->buffer + mem->temp->used;
-    mem->temp->used += size;
-  }
+
+  Arena *arena = (perm) ? mem->perm : mem->temp;
+  size_t aligned_used = (arena->used + (ALIGNMENT - 1)) & (~(ALIGNMENT - 1));
+
+  CHECK(aligned_used + size <= arena->size, "allocate_mem: not enough memory");
+  ptr = arena->buffer + aligned_used;
+  arena->used = aligned_used + size;
   return ptr;
 }
 

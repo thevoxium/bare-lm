@@ -1,11 +1,13 @@
 #ifndef BARE_H
 #define BARE_H
 
+#include <cblas.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define ERROR(msg) fprintf(stderr, "ERROR-> %s\n", msg)
 #define CHECK(cond, msg)                                                       \
@@ -25,6 +27,8 @@
 
 #define PERM 1
 #define TEMP 0
+
+#define ALIGNMENT 32
 
 typedef enum Op {
   NONE,
