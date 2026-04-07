@@ -16,10 +16,10 @@ typedef struct Config {
 } Config;
 
 Config config = {
-    .batch_size = 32,
-    .block_size = 64,
-    .n_embed = 128,
-    .max_iters = 10,
+    .batch_size = 4,
+    .block_size = 1024,
+    .n_embed = 786,
+    .max_iters = 100,
 };
 
 int cmp_char(const void *a, const void *b) { return (*(char *)a - *(char *)b); }
@@ -238,7 +238,7 @@ int *generate(Memory *mem, int *start_tokens, int start_len, int max_new_tokens,
 
 int main() {
   srand(time(NULL));
-  Memory *mem = create_global_mem(1ULL << 31);
+  Memory *mem = create_global_mem(1ULL << 32);
   ParameterList *pl = create_param_list(mem);
 
   FILE *fp = fopen("data/input.txt", "r");

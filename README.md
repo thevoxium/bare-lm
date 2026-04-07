@@ -6,9 +6,11 @@ NOTE: examples & API will CHANGE a lot. This is under active developement.
 
 ## Build & Run
 
+I suggest that you please have gcc-15 installed, much easier to use instead of clang for now (although I just need to change the Makefile somehow, but will do that later on)
+
 ```bash
-make run FILE=main.c        # build and run
-make asan FILE=main.c       # run with address + undefined behavior sanitizer
+make run FILE=main.c CC=gcc-15        # build and run
+make asan FILE=main.c CC=gcc-15       # run with address + undefined behavior sanitizer
 ```
 
 ## Example: XOR with a 2-layer MLP

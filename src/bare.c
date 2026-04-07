@@ -251,7 +251,7 @@ float tensor_get(Tensor *t, int *indices) {
 
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm) {
   Tensor *t = tensor_init(mem, shape, ndim, perm);
-  memset(t->data, 0, t->numel);
+  memset(t->data, 0, sizeof(float) * t->numel);
   CHECK(t, "tensor_zeros: tensor_init failed");
   return t;
 }
@@ -1021,7 +1021,7 @@ static void backward_bmm(Tensor *self) {
     float *a_grad = a->grad + i * a_stride; // M, k
     float *a_data = a->data + i * a_stride;
     float *b_data = b->data + i * b_stride; // K, N
-    float *b_grad = b->data + i * b_stride;
+    float *b_grad = b->grad + i * b_stride;
     float *r_grad = r->grad + i * r_stride; // M, N
 
     // sgemm(M, N, K)
@@ -1949,9 +1949,9 @@ void clip_gradients(ParameterList *pl, float threshold) {
     for (int j = 0; j < t->numel; j++) {
       float g = t->grad[i];
       if (g > threshold) {
-        t->grad[i] = threshold;
+        t->grad[j] = threshold;
       } else if (g < -threshold) {
-        t->grad[i] = -threshold;
+        t->grad[j] = -threshold;
       }
     }
   }
