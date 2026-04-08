@@ -36,6 +36,8 @@ int main() {
   Linear *l1 = create_linear(mem, pl, 2, 8);
   Linear *l2 = create_linear(mem, pl, 8, 1);
 
+  load_checkpoint(pl, "xor.btw");
+
   for (int epoch = 0; epoch < 500; epoch++) {
     zero_grad(pl);
 
@@ -53,6 +55,8 @@ int main() {
     sgd_step(pl, 0.1f);
     reset_temp_mem(mem);
   }
+
+  save_checkpoint(pl, "xor.btw");
 
   free_global_mem(mem);
 }
@@ -156,10 +160,12 @@ sgd_step(pl, 0.01f); // update all parameters
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `create_global_mem` | `(size_t size) → Memory*` | Allocate perm + temp arenas |
+| `create_global_mem` | `(size_t size) → Memory*` | Allocate perm + temp arenas (e.g., 1<<28 = 256MB each) |
 | `reset_temp_mem` | `(Memory *mem)` | Reset temp arena to empty |
 | `allocate_mem` | `(Memory *mem, size_t size, uint8_t perm) → void*` | Arena allocation |
 | `free_global_mem` | `(Memory *mem)` | Free both arenas and Memory |
+| `save_checkpoint` | `(ParameterList *pl, const char *path)` | Save all parameters to binary file |
+| `load_checkpoint` | `(ParameterList *pl, const char *path)` | Load parameters from binary file |
 
 ### ParameterList
 
@@ -170,6 +176,10 @@ sgd_step(pl, 0.01f); // update all parameters
 | `zero_grad` | `(ParameterList *pl)` | Zero gradients for all parameters |
 | `sgd_step` | `(ParameterList *pl, float lr)` | SGD update: `data -= lr * grad` |
 | `clip_gradients` | `(ParameterList *pl, float threshold)` | Clip gradients to [-threshold, threshold] |
+| `adam_init` | `(Memory*, ParameterList*, lr, beta1, beta2, eps, t) → Adam*` | Initialize Adam optimizer state |
+| `adam_step` | `(Adam*, ParameterList*)` | Adam update step |
+| `adamw_init` | `(Memory*, ParameterList*, lr, beta1, beta2, eps, weight_decay, t) → AdamW*` | Initialize AdamW optimizer state |
+| `adamw_step` | `(AdamW*, ParameterList*)` | AdamW update step |
 
 ### Tensor Creation
 
