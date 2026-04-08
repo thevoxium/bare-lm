@@ -1,6 +1,7 @@
 #include "bare.h"
 #include <cblas.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/types.h>
 
 Memory *create_global_mem(size_t size) {
@@ -2083,6 +2084,50 @@ void save_checkpoint(ParameterList *pl, const char *path) {
     fwrite(&numel, sizeof(uint32_t), 1, f);
 
     fwrite(t->data, sizeof(float), numel, f);
+  }
+
+  fclose(f);
+}
+
+void load_checkpoint(ParameterList *pl, const char *path) {
+  CHECK_VOID(pl && path, "load_checkpoint: invalid params");
+
+  uint32_t magic_number;
+  uint32_t version;
+
+  FILE *f = fopen(path, "rb");
+  CHECK_VOID(f, "load_checkpoint: unable to open file");
+
+  fread(&magic_number, 4, 1, f);
+  CHECK_VOID(magic_number == MAGIC_NUMBER, "load_checkpoint: invalid file");
+
+  fread(&version, 4, 1, f);
+
+  uint32_t tensor_count;
+  fread(&tensor_count, 4, 1, f);
+
+  CHECK_VOID(tensor_count == (uint32_t)pl->count,
+             "load_checkpoint: tensor count does not match");
+
+  for (int i = 0; i < tensor_count; i++) {
+    Tensor *t = pl->t[i];
+    uint32_t ndim;
+    fread(&ndim, sizeof(uint32_t), 1, f);
+    CHECK_VOID(ndim == (uint32_t)t->ndim,
+               "load_checkpoint: invalid ndim count found");
+
+    // shape
+    for (int j = 0; j < ndim; j++) {
+      uint32_t dim;
+      fread(&dim, sizeof(uint32_t), 1, f);
+      CHECK_VOID(dim == (uint32_t)t->shape[j],
+                 "load_checkpoint: invalid shapes");
+    }
+    uint32_t numel;
+    fread(&numel, sizeof(uint32_t), 1, f);
+    CHECK_VOID(numel == (uint32_t)t->numel, "load_checkpoint: invalid numel");
+
+    fread(t->data, sizeof(float), numel, f);
   }
 
   fclose(f);

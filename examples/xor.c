@@ -20,6 +20,8 @@ int main() {
   Linear *l1 = create_linear(mem, pl, 2, 8);
   Linear *l2 = create_linear(mem, pl, 8, 1);
 
+  load_checkpoint(pl, "xor.btw");
+
   for (int epoch = 0; epoch < 500; epoch++) {
     zero_grad(pl);
 
