@@ -212,4 +212,6 @@ void clip_gradients(ParameterList *pl, float threshold);
 void save_checkpoint(ParameterList *pl, const char *path);
 void load_checkpoint(ParameterList *pl, const char *path);
 
+void mem_stats(Memory *mem);
+
 #endif //! BARE_H

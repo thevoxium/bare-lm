@@ -1950,7 +1950,7 @@ void clip_gradients(ParameterList *pl, float threshold) {
   for (int i = 0; i < pl->count; i++) {
     Tensor *t = pl->t[i];
     for (int j = 0; j < t->numel; j++) {
-      float g = t->grad[i];
+      float g = t->grad[j];
       if (g > threshold) {
         t->grad[j] = threshold;
       } else if (g < -threshold) {
@@ -2131,4 +2131,14 @@ void load_checkpoint(ParameterList *pl, const char *path) {
   }
 
   fclose(f);
+}
+
+void mem_stats(Memory *mem) {
+  CHECK_VOID(mem, "mem_stats: invalid params");
+  float perm_perc = 1.0 * 100 * mem->perm->used / mem->perm->size;
+  float temp_perc = 1.0 * 100 * mem->temp->used / mem->temp->size;
+  printf("PERM Memory Used: %zu/%zu bytes -> %f%%\n", mem->perm->used,
+         mem->perm->size, perm_perc);
+  printf("TEMP Memory Used: %zu/%zu bytes -> %f%%\n", mem->temp->used,
+         mem->temp->size, temp_perc);
 }

@@ -1,7 +1,7 @@
 #include "../src/bare.h"
 
 int main() {
-  Memory *mem = create_global_mem(1 << 28);
+  Memory *mem = create_global_mem(1 << 14);
   ParameterList *pl = create_param_list(mem);
 
   int x_shape[] = {4, 2};
@@ -37,6 +37,7 @@ int main() {
       printf("epoch %3d  loss=%.4f\n", epoch, loss->data[0]);
 
     sgd_step(pl, 0.1f);
+    // mem_stats(mem);
     reset_temp_mem(mem);
   }
 
