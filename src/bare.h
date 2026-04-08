@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAGIC_NUMBER 0x42415245
 #define ERROR(msg) fprintf(stderr, "ERROR-> %s\n", msg)
 #define CHECK(cond, msg)                                                       \
   do {                                                                         \
@@ -205,5 +206,8 @@ Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices);
 
 void sgd_step(ParameterList *pl, float lr);
 void clip_gradients(ParameterList *pl, float threshold);
+
+void save_checkpoint(ParameterList *pl, const char *path);
+void load_checkpoint(ParameterList *pl, const char *path);
 
 #endif //! BARE_H

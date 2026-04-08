@@ -1,5 +1,6 @@
 #include "bare.h"
 #include <cblas.h>
+#include <stdint.h>
 
 Memory *create_global_mem(size_t size) {
   Memory *mem = (Memory *)malloc(sizeof(Memory));
@@ -2049,4 +2050,19 @@ void adamw_step(AdamW *optim, ParameterList *pl) {
                             optim->weight_decay * t->data[j]);
     }
   }
+}
+
+void save_checkpoint(ParameterList *pl, const char *path) {
+  CHECK_VOID(pl && path, "save_checkpoint: invalid params");
+
+  uint32_t tensor_count = (uint32_t)pl->count;
+  uint32_t magic_number = MAGIC_NUMBER;
+
+  FILE *f = fopen(path, "wb");
+  CHECK_VOID(f, "save_checkpoint: unable to open file");
+
+  fwrite(&magic_number, sizeof(magic_number), 1, f);
+  fclose(f);
+
+  return;
 }
