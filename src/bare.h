@@ -10,6 +10,8 @@
 #include <string.h>
 
 #define MAGIC_NUMBER 0x42415245
+#define VERSION 1
+
 #define ERROR(msg) fprintf(stderr, "ERROR-> %s\n", msg)
 #define CHECK(cond, msg)                                                       \
   do {                                                                         \

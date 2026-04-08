@@ -38,5 +38,7 @@ int main() {
     reset_temp_mem(mem);
   }
 
+  save_checkpoint(pl, "xor.btw");
+
   free_global_mem(mem);
 }

@@ -1,6 +1,7 @@
 #include "bare.h"
 #include <cblas.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 Memory *create_global_mem(size_t size) {
   Memory *mem = (Memory *)malloc(sizeof(Memory));
@@ -2057,12 +2058,32 @@ void save_checkpoint(ParameterList *pl, const char *path) {
 
   uint32_t tensor_count = (uint32_t)pl->count;
   uint32_t magic_number = MAGIC_NUMBER;
+  uint32_t version = VERSION;
 
   FILE *f = fopen(path, "wb");
   CHECK_VOID(f, "save_checkpoint: unable to open file");
 
-  fwrite(&magic_number, sizeof(magic_number), 1, f);
-  fclose(f);
+  fwrite(&magic_number, sizeof(uint32_t), 1, f);
+  fwrite(&version, sizeof(uint32_t), 1, f);
+  fwrite(&tensor_count, sizeof(uint32_t), 1, f);
 
-  return;
+  for (int i = 0; i < tensor_count; i++) {
+    Tensor *t = pl->t[i];
+
+    uint32_t ndim = (uint32_t)t->ndim;
+    fwrite(&ndim, sizeof(uint32_t), 1, f);
+
+    // shape
+    for (int j = 0; j < ndim; j++) {
+      uint32_t dim = (uint32_t)t->shape[j];
+      fwrite(&dim, sizeof(uint32_t), 1, f);
+    }
+
+    uint32_t numel = (uint32_t)t->numel;
+    fwrite(&numel, sizeof(uint32_t), 1, f);
+
+    fwrite(t->data, sizeof(float), numel, f);
+  }
+
+  fclose(f);
 }
