@@ -39,7 +39,7 @@ void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
   Arena *arena = (perm) ? mem->perm : mem->temp;
   size_t aligned_used = (arena->used + (ALIGNMENT - 1)) & (~(ALIGNMENT - 1));
 
-  CHECK(aligned_used + size <= arena->size, "allocate_mem: not enough memory");
+  CHECK(aligned_used <= arena->size - size, "allocate_mem: not enough memory");
   ptr = arena->buffer + aligned_used;
   arena->used = aligned_used + size;
   return ptr;
@@ -209,6 +209,7 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
   CHECK(t->strides, "tensor_init: alloc strides failed");
 
   for (int i = 0; i < ndim; i++) {
+    CHECK(shape[i] > 0, "tensor_init: why do you have negative shapes?");
     t->shape[i] = shape[i];
     t->numel *= shape[i];
   }
@@ -251,8 +252,8 @@ float tensor_get(Tensor *t, int *indices) {
 
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm) {
   Tensor *t = tensor_init(mem, shape, ndim, perm);
-  memset(t->data, 0, sizeof(float) * t->numel);
   CHECK(t, "tensor_zeros: tensor_init failed");
+  memset(t->data, 0, sizeof(float) * t->numel);
   return t;
 }
 
@@ -725,8 +726,6 @@ static void backward_max(Tensor *self) {
   int out_ndim = r->ndim;
   int dim = self->op_params[0];
 
-  int shape[a->ndim];
-
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
     int cord;
@@ -771,7 +770,7 @@ Tensor *max_t(Memory *mem, Tensor *a, int dim) {
   }
 
   Tensor *r = tensor_init(mem, shape, out_ndim, TEMP);
-  CHECK(r, "max_t: failed to create rput tensor");
+  CHECK(r, "max_t: failed to create out tensor");
 
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
@@ -1888,60 +1887,60 @@ Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
   return r;
 }
 
-static void backward_embedding(Tensor *self) {
-  Tensor *r = self;
-  Tensor *a = self->parents[0];
-  Tensor *indices = self->parents[1];
-
-  int V = a->shape[0];
-  int D = a->shape[1];
-
-  int B = indices->shape[0];
-  int T = indices->shape[1];
-
-  for (int b = 0; b < B; b++) {
-    for (int t = 0; t < T; t++) {
-      int idx = indices->data[b * T + t];
-
-      for (int d = 0; d < D; d++) {
-        a->grad[idx * D + d] += r->grad[(b * T + t) * D + d];
-      }
-    }
-  }
-}
-
-// a is vocab
-Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
-  CHECK(a && a->ndim == 2 && indices && indices->ndim == 2,
-        "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
-
-  int D = a->shape[1];
-
-  int B = indices->shape[0];
-  int T = indices->shape[1];
-
-  int out_shape[] = {B, T, D};
-
-  Tensor *r = tensor_zeros(mem, out_shape, 3, TEMP);
-  CHECK(r, "embedding_t: failed to create result tensor");
-
-  for (int b = 0; b < B; b++) {
-    for (int t = 0; t < T; t++) {
-      int idx = indices->data[b * T + t];
-
-      for (int d = 0; d < D; d++) {
-        r->data[(b * T + t) * D + d] = a->data[idx * D + d];
-      }
-    }
-  }
-
-  r->op = EMBEDDING;
-  r->parents[0] = a;
-  r->parents[1] = indices;
-  r->backward = backward_embedding;
-
-  return r;
-}
+// static void backward_embedding(Tensor *self) {
+//   Tensor *r = self;
+//   Tensor *a = self->parents[0];
+//   Tensor *indices = self->parents[1];
+//
+//   int V = a->shape[0];
+//   int D = a->shape[1];
+//
+//   int B = indices->shape[0];
+//   int T = indices->shape[1];
+//
+//   for (int b = 0; b < B; b++) {
+//     for (int t = 0; t < T; t++) {
+//       int idx = indices->data[b * T + t];
+//
+//       for (int d = 0; d < D; d++) {
+//         a->grad[idx * D + d] += r->grad[(b * T + t) * D + d];
+//       }
+//     }
+//   }
+// }
+//
+// // a is vocab
+// Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
+//   CHECK(a && a->ndim == 2 && indices && indices->ndim == 2,
+//         "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
+//
+//   int D = a->shape[1];
+//
+//   int B = indices->shape[0];
+//   int T = indices->shape[1];
+//
+//   int out_shape[] = {B, T, D};
+//
+//   Tensor *r = tensor_zeros(mem, out_shape, 3, TEMP);
+//   CHECK(r, "embedding_t: failed to create result tensor");
+//
+//   for (int b = 0; b < B; b++) {
+//     for (int t = 0; t < T; t++) {
+//       int idx = indices->data[b * T + t];
+//
+//       for (int d = 0; d < D; d++) {
+//         r->data[(b * T + t) * D + d] = a->data[idx * D + d];
+//       }
+//     }
+//   }
+//
+//   r->op = EMBEDDING;
+//   r->parents[0] = a;
+//   r->parents[1] = indices;
+//   r->backward = backward_embedding;
+//
+//   return r;
+// }
 
 void clip_gradients(ParameterList *pl, float threshold) {
   for (int i = 0; i < pl->count; i++) {
@@ -2051,6 +2050,9 @@ void adamw_step(AdamW *optim, ParameterList *pl) {
   }
 }
 
+// I am fully aware that this code is unsafe (not saying rest of it is safe), i
+// am not checking return anywhere and fclose will nothappen if CHECKVOID runs,
+// but that is a problem for tomorrow.
 void save_checkpoint(ParameterList *pl, const char *path) {
   CHECK_VOID(pl && path, "save_checkpoint: invalid params");
 
@@ -2086,6 +2088,7 @@ void save_checkpoint(ParameterList *pl, const char *path) {
   fclose(f);
 }
 
+// unsafe
 void load_checkpoint(ParameterList *pl, const char *path) {
   CHECK_VOID(pl && path, "load_checkpoint: invalid params");
 
@@ -2099,6 +2102,7 @@ void load_checkpoint(ParameterList *pl, const char *path) {
   CHECK_VOID(magic_number == MAGIC_NUMBER, "load_checkpoint: invalid file");
 
   fread(&version, 4, 1, f);
+  CHECK_VOID(version == VERSION, "load_checkpoint: invalid version");
 
   uint32_t tensor_count;
   fread(&tensor_count, 4, 1, f);
