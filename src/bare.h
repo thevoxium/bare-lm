@@ -86,6 +86,7 @@ typedef struct Tensor {
   struct Tensor *parents[2];
   int ndim;
   int numel;
+  uint32_t visited_gen;
   Op op;
   void (*backward)(struct Tensor *self);
   float op_params[4];

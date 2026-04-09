@@ -1,6 +1,9 @@
 #include "../src/bare.h"
+#include <time.h>
 
 int main() {
+  srand(time(NULL));
+
   Memory *mem = create_global_mem(1 << 14);
   ParameterList *pl = create_param_list(mem);
 
@@ -20,9 +23,9 @@ int main() {
   Linear *l1 = create_linear(mem, pl, 2, 8);
   Linear *l2 = create_linear(mem, pl, 8, 1);
 
-  load_checkpoint(pl, "xor.btw");
+  // load_checkpoint(pl, "xor.btw");
 
-  for (int epoch = 0; epoch < 500; epoch++) {
+  for (int epoch = 0; epoch < 5000; epoch++) {
     zero_grad(pl);
 
     Tensor *h = linear_t(mem, l1, x);
@@ -41,7 +44,7 @@ int main() {
     reset_temp_mem(mem);
   }
 
-  save_checkpoint(pl, "xor.btw");
+  // save_checkpoint(pl, "xor.btw");
 
   free_global_mem(mem);
 }

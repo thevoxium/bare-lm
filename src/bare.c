@@ -148,22 +148,20 @@ void print_t(Tensor *t, uint8_t grad) {
 }
 
 static void build_topo(Memory *mem, Tensor *root, Dt_array *result,
-                       Dt_array *visited) {
+                       uint32_t *current_gen) {
   if (!root) {
     return;
   }
 
-  for (int i = 0; i < visited->count; i++) {
-    if (visited->t[i] == root) {
-      return;
-    }
+  if (root->visited_gen == *current_gen) {
+    return;
+  } else {
+    root->visited_gen = *current_gen;
   }
-
-  dt_array_push(mem, visited, root, TEMP);
 
   for (int i = 0; i < 2; i++) {
     if (root->parents[i]) {
-      build_topo(mem, root->parents[i], result, visited);
+      build_topo(mem, root->parents[i], result, current_gen);
     }
   }
 
@@ -176,10 +174,9 @@ void backward(Memory *mem, Tensor *root) {
   Dt_array *result = dt_array_create(mem, TEMP);
   CHECK_VOID(result, "backward: failed to create result array");
 
-  Dt_array *visited = dt_array_create(mem, TEMP);
-  CHECK_VOID(visited, "backward: failed to create visited array");
-
-  build_topo(mem, root, result, visited);
+  static uint32_t gen = 1;
+  uint32_t current_gen = gen++;
+  build_topo(mem, root, result, &current_gen);
 
   for (int i = 0; i < root->numel; i++) {
     root->grad[i] = 1.0f;
