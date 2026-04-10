@@ -2171,3 +2171,9 @@ void replace_t(Tensor *a, Tensor *b) {
     a->data[i] = b->data[i];
   }
 }
+
+void detach_t(Tensor *a) {
+  CHECK_VOID(a, "detach_t: invalid params");
+  a->parents[0] = NULL;
+  a->parents[1] = NULL;
+}

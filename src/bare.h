@@ -216,6 +216,7 @@ Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim);
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim);
 void replace_t(Tensor *a, Tensor *b);
+void detach_t(Tensor *a);
 
 void sgd_step(ParameterList *pl, float lr);
 void clip_gradients(ParameterList *pl, float threshold);
