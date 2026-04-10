@@ -202,6 +202,46 @@ void backward(Memory *mem, Tensor *root) {
   }
 }
 
+int element_size(Tensor *a) {
+  if (a) {
+    return sizeof(a->data[0]);
+  }
+  return 0;
+}
+
+int nbytes(Tensor *a) {
+  if (a) {
+    return a->numel * sizeof(a->data[0]);
+  }
+  return 0;
+}
+
+uint8_t is_floating_point(Tensor *a) {
+  if (a) {
+    return (a->dt == fp32) ? 1 : 0;
+  }
+  return 0;
+}
+
+int *tensor_size(Memory *mem, Tensor *a) {
+  if (a) {
+    int *shape = (int *)allocate_mem(mem, a->ndim * sizeof(int), TEMP);
+    for (int i = 0; i < a->ndim; i++) {
+      shape[i] = a->shape[i];
+    }
+    return shape;
+  }
+  return NULL;
+}
+
+float item(Tensor *a) {
+  if (a && a->numel == 1) {
+    return a->data[0];
+  }
+  ERROR("item: numel > 1");
+  return 0.0f;
+}
+
 Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
   CHECK(mem && shape && ndim > 0,
         "tensor_init: mem is NULL, shape is NULL, or ndim <= 0");
@@ -244,6 +284,7 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
   t->parents[0] = NULL;
   t->parents[1] = NULL;
   t->backward = NULL;
+  t->dt = fp32;
 
   return t;
 }
@@ -2122,4 +2163,11 @@ void mem_stats(Memory *mem) {
          mem->perm->size, perm_perc);
   printf("TEMP Memory Used: %zu/%zu bytes -> %f%%\n", mem->temp->used,
          mem->temp->size, temp_perc);
+}
+
+void replace_t(Tensor *a, Tensor *b) {
+  CHECK_VOID(check_op_compatibilty(a, b), "replace_t: not compatible");
+  for (int i = 0; i < a->numel; i++) {
+    a->data[i] = b->data[i];
+  }
 }

@@ -67,6 +67,10 @@ typedef enum Op {
   EMBEDDING,
 } Op;
 
+typedef enum DType {
+  fp32,
+} DType;
+
 typedef struct Arena {
   uint8_t *buffer;
   size_t size;
@@ -90,6 +94,7 @@ typedef struct Tensor {
   Op op;
   void (*backward)(struct Tensor *self);
   float op_params[4];
+  DType dt;
 } Tensor;
 
 typedef struct Dt_array {
@@ -165,6 +170,12 @@ Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x);
 
 void backward(Memory *mem, Tensor *root);
 
+int element_size(Tensor *a);
+int nbytes(Tensor *a);
+uint8_t is_floating_point(Tensor *a);
+int *tensor_size(Memory *mem, Tensor *a);
+float item(Tensor *a);
+
 Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_ones(Memory *mem, int *shape, int ndim, uint8_t perm);
@@ -204,6 +215,7 @@ Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim);
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim);
+void replace_t(Tensor *a, Tensor *b);
 
 void sgd_step(ParameterList *pl, float lr);
 void clip_gradients(ParameterList *pl, float threshold);
