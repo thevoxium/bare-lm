@@ -312,6 +312,18 @@ Tensor *tensor_xavier(Memory *mem, int *shape, int ndim, uint8_t perm) {
   return r;
 }
 
+static inline uint8_t check_op_compatibilty(Tensor *a, Tensor *b) {
+  if (!a || !b || a->ndim != b->ndim) {
+    return 0;
+  }
+
+  for (int i = 0; i < a->ndim; i++) {
+    if (a->shape[i] != b->shape[i])
+      return 0;
+  }
+  return 1;
+}
+
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
@@ -323,7 +335,7 @@ static void backward_add(Tensor *self) {
 }
 
 Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel,
+  CHECK(a && b && check_op_compatibilty(a, b),
         "add_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
@@ -358,7 +370,7 @@ static void backward_sub(Tensor *self) {
 }
 
 Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel,
+  CHECK(a && b && check_op_compatibilty(a, b),
         "sub_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
@@ -394,7 +406,7 @@ static void backward_mul(Tensor *self) {
 }
 
 Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel,
+  CHECK(a && b && check_op_compatibilty(a, b),
         "mul_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
@@ -430,7 +442,7 @@ static void backward_div(Tensor *self) {
 }
 
 Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel,
+  CHECK(a && b && check_op_compatibilty(a, b),
         "divide_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
@@ -943,7 +955,7 @@ static void backward_mse(Tensor *self) {
 }
 
 Tensor *mseloss_t(Memory *mem, Tensor *a, Tensor *b) {
-  CHECK(a && b && a->numel == b->numel,
+  CHECK(a && b && check_op_compatibilty(a, b),
         "mseloss_t: a is NULL, b is NULL, or tensor sizes do not match");
 
   int shape[] = {1};
