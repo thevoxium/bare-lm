@@ -13,3 +13,4 @@ compile_commands.json
 perf*
 *.btw
 examples/small_llm.c
+web/
