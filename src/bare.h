@@ -182,9 +182,11 @@ Tensor *tensor_ones(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_xavier(Memory *mem, int *shape, int ndim, uint8_t perm);
 Tensor *tensor_eye(Memory *mem, int n, int m, uint8_t perm);
-Tensor *tensor_full_like(Memory *mem, Tensor *a, float fill_value, uint8_t perm);
+Tensor *tensor_full_like(Memory *mem, Tensor *a, float fill_value,
+                         uint8_t perm);
 Tensor *tensor_zeros_like(Memory *mem, Tensor *a, uint8_t perm);
 Tensor *tensor_ones_like(Memory *mem, Tensor *a, uint8_t perm);
+Tensor *tensor_randn_like(Memory *mem, Tensor *a, uint8_t perm);
 void print_t(Tensor *t, uint8_t grad);
 void zero_grad(ParameterList *pl);
 

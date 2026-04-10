@@ -305,6 +305,7 @@ Tensor *tensor_ones(Memory *mem, int *shape, int ndim, uint8_t perm) {
   return t;
 }
 
+// this is called box muller transform, learn about it later on.
 Tensor *tensor_randn(Memory *mem, int *shape, int ndim, uint8_t perm) {
   Tensor *t = tensor_init(mem, shape, ndim, perm);
   CHECK(t, "tensor_randn: tensor_init failed");
@@ -370,7 +371,8 @@ Tensor *tensor_eye(Memory *mem, int n, int m, uint8_t perm) {
   return r;
 }
 
-Tensor *tensor_full_like(Memory *mem, Tensor *a, float fill_value, uint8_t perm) {
+Tensor *tensor_full_like(Memory *mem, Tensor *a, float fill_value,
+                         uint8_t perm) {
   CHECK(a, "tensor_full_like: a is NULL");
   Tensor *r = tensor_init(mem, a->shape, a->ndim, perm);
   CHECK(r, "tensor_full_like: tensor_init failed");
@@ -390,6 +392,11 @@ Tensor *tensor_zeros_like(Memory *mem, Tensor *a, uint8_t perm) {
 Tensor *tensor_ones_like(Memory *mem, Tensor *a, uint8_t perm) {
   CHECK(a, "tensor_ones_like: a is NULL");
   return tensor_ones(mem, a->shape, a->ndim, perm);
+}
+
+Tensor *tensor_randn_like(Memory *mem, Tensor *a, uint8_t perm) {
+  CHECK(a, "tensor_ones_like: a is NULL");
+  return tensor_randn(mem, a->shape, a->ndim, perm);
 }
 
 static inline uint8_t check_op_compatibilty(Tensor *a, Tensor *b) {
