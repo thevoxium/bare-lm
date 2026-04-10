@@ -1895,61 +1895,6 @@ Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
   return r;
 }
 
-// static void backward_embedding(Tensor *self) {
-//   Tensor *r = self;
-//   Tensor *a = self->parents[0];
-//   Tensor *indices = self->parents[1];
-//
-//   int V = a->shape[0];
-//   int D = a->shape[1];
-//
-//   int B = indices->shape[0];
-//   int T = indices->shape[1];
-//
-//   for (int b = 0; b < B; b++) {
-//     for (int t = 0; t < T; t++) {
-//       int idx = indices->data[b * T + t];
-//
-//       for (int d = 0; d < D; d++) {
-//         a->grad[idx * D + d] += r->grad[(b * T + t) * D + d];
-//       }
-//     }
-//   }
-// }
-//
-// // a is vocab
-// Tensor *embedding_t(Memory *mem, Tensor *a, Tensor *indices) {
-//   CHECK(a && a->ndim == 2 && indices && indices->ndim == 2,
-//         "embedding_t: a is NULL, indices is NULL, or tensors are not 2D");
-//
-//   int D = a->shape[1];
-//
-//   int B = indices->shape[0];
-//   int T = indices->shape[1];
-//
-//   int out_shape[] = {B, T, D};
-//
-//   Tensor *r = tensor_zeros(mem, out_shape, 3, TEMP);
-//   CHECK(r, "embedding_t: failed to create result tensor");
-//
-//   for (int b = 0; b < B; b++) {
-//     for (int t = 0; t < T; t++) {
-//       int idx = indices->data[b * T + t];
-//
-//       for (int d = 0; d < D; d++) {
-//         r->data[(b * T + t) * D + d] = a->data[idx * D + d];
-//       }
-//     }
-//   }
-//
-//   r->op = EMBEDDING;
-//   r->parents[0] = a;
-//   r->parents[1] = indices;
-//   r->backward = backward_embedding;
-//
-//   return r;
-// }
-
 void clip_gradients(ParameterList *pl, float threshold) {
   for (int i = 0; i < pl->count; i++) {
     Tensor *t = pl->t[i];
