@@ -190,7 +190,10 @@ sgd_step(pl, 0.01f); // update all parameters
 | `tensor_ones` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | All ones |
 | `tensor_randn` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | Random normal (Box-Muller) |
 | `tensor_xavier` | `(Memory*, int *shape, int ndim, uint8_t perm) → Tensor*` | Xavier initialization |
-| `tensor_get` | `(Tensor*, int *indices) → float` | Get element at multi-dim index |
+| `tensor_eye` | `(Memory*, int n, int m, uint8_t perm) → Tensor*` | Identity matrix (n×n or n×m) |
+| `tensor_full_like` | `(Memory*, Tensor *a, float fill_value, uint8_t perm) → Tensor*` | Same shape as a, filled with fill_value |
+| `tensor_zeros_like` | `(Memory*, Tensor *a, uint8_t perm) → Tensor*` | Same shape as a, filled with zeros |
+| `tensor_ones_like` | `(Memory*, Tensor *a, uint8_t perm) → Tensor*` | Same shape as a, filled with ones |
 | `print_t` | `(Tensor*, uint8_t grad)` | Print tensor (grad=1 to include gradients) |
 
 ### Arithmetic
