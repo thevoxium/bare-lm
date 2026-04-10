@@ -5,10 +5,12 @@
 #include <sys/types.h>
 
 Memory *create_global_mem(size_t size) {
+  CHECK(size > 0, "create_global_mem: size <= 0");
   Memory *mem = (Memory *)malloc(sizeof(Memory));
   CHECK(mem, "create_global_mem: failed to allocate Memory struct");
-
   size = (size + ALIGNMENT - 1) & (~(ALIGNMENT - 1));
+  CHECK(size <= SIZE_MAX - (ALIGNMENT - 1),
+        "create_global_mem: overflow in alignment");
 
   mem->perm = (Arena *)malloc(sizeof(Arena));
   mem->temp = (Arena *)malloc(sizeof(Arena));
@@ -246,18 +248,6 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
   return t;
 }
 
-float tensor_get(Tensor *t, int *indices) {
-  if (!t || !indices) {
-    ERROR("tensor_get: t or indices is NULL");
-    return 0.0f;
-  }
-  int idx = 0;
-  for (int i = 0; i < t->ndim; i++) {
-    idx += indices[i] * t->strides[i];
-  }
-  return t->data[idx];
-}
-
 Tensor *tensor_zeros(Memory *mem, int *shape, int ndim, uint8_t perm) {
   Tensor *t = tensor_init(mem, shape, ndim, perm);
   CHECK(t, "tensor_zeros: tensor_init failed");
@@ -453,6 +443,7 @@ Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
   float *__restrict__ b_data = b->data;
 
   for (int i = 0; i < N; i++) {
+    CHECK(b_data[i] != 0.0f, "divide_t: 0.0 denominator");
     r_data[i] = a_data[i] / b_data[i];
   }
 
@@ -566,6 +557,7 @@ static void backward_log(Tensor *self) {
 
   int N = self->numel;
   for (int i = 0; i < N; i++) {
+    CHECK_VOID(a->data[i] != 0.0f, "backward_log: 0.0 denominator");
     a->grad[i] += self->grad[i] / a->data[i];
   }
 }
@@ -578,6 +570,7 @@ Tensor *log_t(Memory *mem, Tensor *a) {
 
   int N = r->numel;
   for (int i = 0; i < N; i++) {
+    CHECK(a->data > 0, "log_t: negative data");
     r->data[i] = logf(a->data[i]);
   }
 
@@ -2003,88 +1996,110 @@ void adamw_step(AdamW *optim, ParameterList *pl) {
   }
 }
 
-// I am fully aware that this code is unsafe (not saying rest of it is safe), i
-// am not checking return anywhere and fclose will nothappen if CHECKVOID runs,
-// but that is a problem for tomorrow.
 void save_checkpoint(ParameterList *pl, const char *path) {
   CHECK_VOID(pl && path, "save_checkpoint: invalid params");
+
+  FILE *f = fopen(path, "wb");
+  CHECK_VOID(f, "save_checkpoint: unable to open file");
 
   uint32_t tensor_count = (uint32_t)pl->count;
   uint32_t magic_number = MAGIC_NUMBER;
   uint32_t version = VERSION;
 
-  FILE *f = fopen(path, "wb");
-  CHECK_VOID(f, "save_checkpoint: unable to open file");
+  if (fwrite(&magic_number, sizeof(uint32_t), 1, f) != 1)
+    goto fail;
+  if (fwrite(&version, sizeof(uint32_t), 1, f) != 1)
+    goto fail;
+  if (fwrite(&tensor_count, sizeof(uint32_t), 1, f) != 1)
+    goto fail;
 
-  fwrite(&magic_number, sizeof(uint32_t), 1, f);
-  fwrite(&version, sizeof(uint32_t), 1, f);
-  fwrite(&tensor_count, sizeof(uint32_t), 1, f);
-
-  for (int i = 0; i < tensor_count; i++) {
+  for (uint32_t i = 0; i < tensor_count; i++) {
     Tensor *t = pl->t[i];
 
     uint32_t ndim = (uint32_t)t->ndim;
-    fwrite(&ndim, sizeof(uint32_t), 1, f);
+    if (fwrite(&ndim, sizeof(uint32_t), 1, f) != 1)
+      goto fail;
 
-    // shape
-    for (int j = 0; j < ndim; j++) {
+    for (uint32_t j = 0; j < ndim; j++) {
       uint32_t dim = (uint32_t)t->shape[j];
-      fwrite(&dim, sizeof(uint32_t), 1, f);
+      if (fwrite(&dim, sizeof(uint32_t), 1, f) != 1)
+        goto fail;
     }
 
     uint32_t numel = (uint32_t)t->numel;
-    fwrite(&numel, sizeof(uint32_t), 1, f);
+    if (fwrite(&numel, sizeof(uint32_t), 1, f) != 1)
+      goto fail;
 
-    fwrite(t->data, sizeof(float), numel, f);
+    if (fwrite(t->data, sizeof(float), numel, f) != numel)
+      goto fail;
   }
 
   fclose(f);
+  return;
+
+fail:
+  fclose(f);
+  CHECK_VOID(0, "save_checkpoint: write failed");
 }
 
-// unsafe
 void load_checkpoint(ParameterList *pl, const char *path) {
   CHECK_VOID(pl && path, "load_checkpoint: invalid params");
-
-  uint32_t magic_number;
-  uint32_t version;
 
   FILE *f = fopen(path, "rb");
   CHECK_VOID(f, "load_checkpoint: unable to open file");
 
-  fread(&magic_number, 4, 1, f);
-  CHECK_VOID(magic_number == MAGIC_NUMBER, "load_checkpoint: invalid file");
-
-  fread(&version, 4, 1, f);
-  CHECK_VOID(version == VERSION, "load_checkpoint: invalid version");
-
+  uint32_t magic_number;
+  uint32_t version;
   uint32_t tensor_count;
-  fread(&tensor_count, 4, 1, f);
 
-  CHECK_VOID(tensor_count == (uint32_t)pl->count,
-             "load_checkpoint: tensor count does not match");
+  if (fread(&magic_number, sizeof(uint32_t), 1, f) != 1)
+    goto fail;
+  if (magic_number != MAGIC_NUMBER)
+    goto fail;
 
-  for (int i = 0; i < tensor_count; i++) {
+  if (fread(&version, sizeof(uint32_t), 1, f) != 1)
+    goto fail;
+  if (version != VERSION)
+    goto fail;
+
+  if (fread(&tensor_count, sizeof(uint32_t), 1, f) != 1)
+    goto fail;
+  if (tensor_count != (uint32_t)pl->count)
+    goto fail;
+
+  for (uint32_t i = 0; i < tensor_count; i++) {
     Tensor *t = pl->t[i];
+
     uint32_t ndim;
-    fread(&ndim, sizeof(uint32_t), 1, f);
-    CHECK_VOID(ndim == (uint32_t)t->ndim,
-               "load_checkpoint: invalid ndim count found");
+    if (fread(&ndim, sizeof(uint32_t), 1, f) != 1)
+      goto fail;
+    if (ndim != (uint32_t)t->ndim)
+      goto fail;
 
-    // shape
-    for (int j = 0; j < ndim; j++) {
+    for (uint32_t j = 0; j < ndim; j++) {
       uint32_t dim;
-      fread(&dim, sizeof(uint32_t), 1, f);
-      CHECK_VOID(dim == (uint32_t)t->shape[j],
-                 "load_checkpoint: invalid shapes");
+      if (fread(&dim, sizeof(uint32_t), 1, f) != 1)
+        goto fail;
+      if (dim != (uint32_t)t->shape[j])
+        goto fail;
     }
-    uint32_t numel;
-    fread(&numel, sizeof(uint32_t), 1, f);
-    CHECK_VOID(numel == (uint32_t)t->numel, "load_checkpoint: invalid numel");
 
-    fread(t->data, sizeof(float), numel, f);
+    uint32_t numel;
+    if (fread(&numel, sizeof(uint32_t), 1, f) != 1)
+      goto fail;
+    if (numel != (uint32_t)t->numel)
+      goto fail;
+
+    if (fread(t->data, sizeof(float), numel, f) != numel)
+      goto fail;
   }
 
   fclose(f);
+  return;
+
+fail:
+  fclose(f);
+  CHECK_VOID(0, "load_checkpoint: read failed");
 }
 
 void mem_stats(Memory *mem) {
