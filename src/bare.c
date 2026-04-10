@@ -353,6 +353,45 @@ Tensor *tensor_xavier(Memory *mem, int *shape, int ndim, uint8_t perm) {
   return r;
 }
 
+Tensor *tensor_eye(Memory *mem, int n, int m, uint8_t perm) {
+  CHECK(n > 0, "tensor_eye: n must be positive");
+  int rows = n;
+  int cols = (m > 0) ? m : n;
+
+  int shape[] = {rows, cols};
+  Tensor *r = tensor_zeros(mem, shape, 2, perm);
+  CHECK(r, "tensor_eye: tensor_zeros failed");
+
+  int min_nm = (rows < cols) ? rows : cols;
+  for (int i = 0; i < min_nm; i++) {
+    r->data[i * cols + i] = 1.0f;
+  }
+
+  return r;
+}
+
+Tensor *tensor_full_like(Memory *mem, Tensor *a, float fill_value, uint8_t perm) {
+  CHECK(a, "tensor_full_like: a is NULL");
+  Tensor *r = tensor_init(mem, a->shape, a->ndim, perm);
+  CHECK(r, "tensor_full_like: tensor_init failed");
+
+  for (int i = 0; i < r->numel; i++) {
+    r->data[i] = fill_value;
+  }
+
+  return r;
+}
+
+Tensor *tensor_zeros_like(Memory *mem, Tensor *a, uint8_t perm) {
+  CHECK(a, "tensor_zeros_like: a is NULL");
+  return tensor_zeros(mem, a->shape, a->ndim, perm);
+}
+
+Tensor *tensor_ones_like(Memory *mem, Tensor *a, uint8_t perm) {
+  CHECK(a, "tensor_ones_like: a is NULL");
+  return tensor_ones(mem, a->shape, a->ndim, perm);
+}
+
 static inline uint8_t check_op_compatibilty(Tensor *a, Tensor *b) {
   if (!a || !b || a->ndim != b->ndim) {
     return 0;
