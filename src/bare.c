@@ -33,15 +33,23 @@ void reset_temp_mem(Memory *mem) {
 }
 
 void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
-  CHECK(mem && size > 0, "allocate_mem: mem is NULL or size is 0");
-  void *ptr = NULL;
+  CHECK(mem && size > 0, "allocate_mem: invalid params");
 
-  Arena *arena = (perm) ? mem->perm : mem->temp;
-  size_t aligned_used = (arena->used + (ALIGNMENT - 1)) & (~(ALIGNMENT - 1));
+  Arena *arena = perm ? mem->perm : mem->temp;
+  CHECK(arena && arena->buffer, "allocate_mem: invalid arena");
 
-  CHECK(aligned_used <= arena->size - size, "allocate_mem: not enough memory");
-  ptr = arena->buffer + aligned_used;
+  CHECK(arena->used <= SIZE_MAX - (ALIGNMENT - 1),
+        "allocate_mem: overflow in alignment");
+
+  size_t aligned_used = (arena->used + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+
+  CHECK(aligned_used <= arena->size, "allocate_mem: used > size");
+  CHECK(size <= arena->size - aligned_used, "allocate_mem: not enough memory");
+
+  void *ptr = (uint8_t *)arena->buffer + aligned_used;
+
   arena->used = aligned_used + size;
+
   return ptr;
 }
 
