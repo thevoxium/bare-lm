@@ -107,20 +107,24 @@ void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm) {
   a->t[a->count++] = t;
 }
 
-static void print_data(float *data, int *shape, int ndim, int dim, int *idx,
-                       int indent) {
+static void print_data(float *data, int *shape, int *strides, int ndim, int dim,
+                        int *indices, int indent) {
   printf("%*s[", indent, "");
   if (dim == ndim - 1) {
     for (int i = 0; i < shape[dim]; i++) {
-      printf("%.4f", data[*idx]);
-      (*idx)++;
+      indices[dim] = i;
+      int idx = 0;
+      for (int d = 0; d < ndim; d++)
+        idx += indices[d] * strides[d];
+      printf("%.4f", data[idx]);
       if (i < shape[dim] - 1)
         printf(", ");
     }
   } else {
     printf("\n");
     for (int i = 0; i < shape[dim]; i++) {
-      print_data(data, shape, ndim, dim + 1, idx, indent + 2);
+      indices[dim] = i;
+      print_data(data, shape, strides, ndim, dim + 1, indices, indent + 2);
       if (i < shape[dim] - 1)
         printf(",\n");
     }
@@ -136,9 +140,12 @@ void print_t(Tensor *t, uint8_t grad) {
     return;
   }
 
+  int indices[t->ndim];
+  for (int i = 0; i < t->ndim; i++)
+    indices[i] = 0;
+
   printf("Tensor(\n");
-  int idx = 0;
-  print_data(t->data, t->shape, t->ndim, 0, &idx, 2);
+  print_data(t->data, t->shape, t->strides, t->ndim, 0, indices, 2);
   printf(",\n  shape=[");
   for (int i = 0; i < t->ndim; i++) {
     printf("%lld", (long long)t->shape[i]);
@@ -149,8 +156,9 @@ void print_t(Tensor *t, uint8_t grad) {
 
   if (grad) {
     printf(",\n  grad=\n");
-    idx = 0;
-    print_data(t->grad, t->shape, t->ndim, 0, &idx, 2);
+    for (int i = 0; i < t->ndim; i++)
+      indices[i] = 0;
+    print_data(t->grad, t->shape, t->strides, t->ndim, 0, indices, 2);
     printf("\n)\n");
   } else {
     printf("\n)\n");
