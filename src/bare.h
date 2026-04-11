@@ -33,6 +33,8 @@
 
 #define ALIGNMENT 32
 
+#define S(...) (int[]){__VA_ARGS__}
+
 typedef enum Op {
   NONE,
   ADD,
