@@ -667,17 +667,6 @@ Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
 static void backward_div(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
-
-  int N = self->numel;
-  for (int i = 0; i < N; i++) {
-    a->grad[i] += self->grad[i] / b->data[i];
-    b->grad[i] -= self->grad[i] * a->data[i] / (b->data[i] * b->data[i]);
-  }
-}
-
-static void backward_div(Tensor *self) {
-  Tensor *a = self->parents[0];
-  Tensor *b = self->parents[1];
   Tensor *r = self;
 
   int N = r->numel;
