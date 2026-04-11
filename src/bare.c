@@ -108,7 +108,7 @@ void dt_array_push(Memory *mem, Dt_array *a, Tensor *t, uint8_t perm) {
 }
 
 static void print_data(float *data, int *shape, int *strides, int ndim, int dim,
-                        int *indices, int indent) {
+                       int *indices, int indent) {
   printf("%*s[", indent, "");
   if (dim == ndim - 1) {
     for (int i = 0; i < shape[dim]; i++) {
@@ -293,6 +293,7 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
   t->parents[1] = NULL;
   t->backward = NULL;
   t->dt = fp32;
+  t->contiguous = 1;
 
   return t;
 }
@@ -1183,24 +1184,33 @@ static void backward_transpose(Tensor *self) {
 
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < m; j++) {
-      // a[j][i] += self.grad[i][j]
-      a->grad[j * a->shape[1] + i] += self->grad[i * m + j];
+      int r_idx = i * self->strides[0] + j * self->strides[1];
+      int a_idx = j * a->strides[0] + i * a->strides[1];
+      a->grad[a_idx] += self->grad[r_idx];
     }
   }
 }
 
 Tensor *transpose_t(Memory *mem, Tensor *a) {
   CHECK(a && a->ndim == 2, "transpose_t: a is NULL or not a 2D tensor");
-  int result_shape[] = {a->shape[1], a->shape[0]};
-  Tensor *r = tensor_zeros(mem, result_shape, 2, TEMP);
-  CHECK(r, "transpose_t: result tensor failed");
 
-  for (int i = 0; i < result_shape[0]; i++) {
-    for (int j = 0; j < result_shape[1]; j++) {
-      r->data[i * result_shape[1] + j] = a->data[j * result_shape[0] + i];
-    }
-  }
-
+  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
+  CHECK(r, "transpose_t: allocate_mem failed");
+  r->data = a->data;
+  r->grad = (float *)allocate_mem(mem, sizeof(float) * a->numel, TEMP);
+  r->shape = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
+  r->strides = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
+  CHECK(r->grad && r->shape && r->strides,
+        "transpose_t: grad, shape, stride allocation failed");
+  r->shape[0] = a->shape[1];
+  r->shape[1] = a->shape[0];
+  r->strides[0] = a->strides[1];
+  r->strides[1] = a->strides[0];
+  r->ndim = a->ndim;
+  r->numel = a->numel;
+  r->visited_gen = a->visited_gen;
+  r->contiguous = 0;
+  r->dt = fp32;
   r->parents[0] = a;
   r->parents[1] = NULL;
   r->backward = backward_transpose;

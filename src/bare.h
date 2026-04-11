@@ -33,7 +33,8 @@
 
 #define ALIGNMENT 32
 
-#define S(...) (int[]){__VA_ARGS__}
+#define S(...)                                                                 \
+  (int[]) { __VA_ARGS__ }
 
 typedef enum Op {
   NONE,
@@ -93,6 +94,7 @@ typedef struct Tensor {
   int ndim;
   int numel;
   uint32_t visited_gen;
+  uint8_t contiguous;
   Op op;
   void (*backward)(struct Tensor *self);
   float op_params[4];
