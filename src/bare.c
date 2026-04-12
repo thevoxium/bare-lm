@@ -2299,21 +2299,21 @@ static void backward_softmax(Tensor *self) {
       curr /= r->shape[d];
     }
 
-    int a_idx = 0;
+    int offset = 0;
     for (int d = 0; d < a->ndim; d++) {
       if (d != dim) {
-        a_idx += (idx[d] * a->strides[d]);
+        offset += (idx[d] * a->strides[d]);
       }
     }
 
     float sum = 0.0f;
     for (int k = 0; k < r->shape[dim]; k++) {
-      int final_idx = a_idx + k * a->strides[dim];
+      int final_idx = offset + k * a->strides[dim];
       sum += r->grad[final_idx] * r->data[final_idx];
     }
 
     int k = idx[dim];
-    int final_idx = a_idx + k * a->strides[dim];
+    int final_idx = offset + k * a->strides[dim];
     float data = r->data[final_idx];
     a->grad[final_idx] += data * (r->grad[final_idx] - sum);
   }
@@ -2326,34 +2326,34 @@ Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "softmax_t: failed to create result tensor");
 
+  int idx[r->ndim];
+  memset(idx, 0, sizeof(idx));
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
-    int idx[a->ndim];
     for (int d = r->ndim - 1; d >= 0; d--) {
       idx[d] = curr % r->shape[d];
       curr /= r->shape[d];
     }
-
-    int a_idx = 0;
-    for (int d = 0; d < a->ndim; d++) {
-      if (d != dim) {
-        a_idx += (idx[d] * a->strides[d]);
-      }
+    int offset = 0;
+    for (int d = 0; d < r->ndim; d++) {
+      if (d == dim)
+        continue;
+      offset += idx[d] * a->strides[d];
     }
 
-    float m = -1e10;
+    float m = -INFINITY;
     for (int k = 0; k < r->shape[dim]; k++) {
-      float v = a->data[a_idx + k * a->strides[dim]];
+      float v = a->data[offset + k * a->strides[dim]];
       if (m < v)
         m = v;
     }
+
     float sum = 0.0f;
     for (int k = 0; k < r->shape[dim]; k++) {
-      sum += (expf(a->data[a_idx + k * a->strides[dim]] - m));
+      sum += expf(a->data[offset + k * a->strides[dim]] - m);
     }
 
-    int k = idx[dim];
-    r->data[i] = expf(a->data[a_idx + k * a->strides[dim]] - m) / sum;
+    r->data[i] = expf(a->data[offset + idx[dim] * a->strides[dim]] - m) / sum;
   }
 
   r->op = SOFTMAX;
