@@ -2253,18 +2253,17 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
 
   Tensor *r = tensor_zeros(mem, out_shape, total_dim, TEMP);
   CHECK(r, "permute_t: failed to create result tensor");
-
+  int idx[r->ndim];
+  int input_idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  memset(input_idx, 0, sizeof(input_idx));
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
-    int idx[r->ndim];
-
     for (int d = r->ndim - 1; d >= 0; d--) {
       idx[d] = curr % r->shape[d];
       curr /= r->shape[d];
     }
-
     int a_idx = 0;
-    int input_idx[a->ndim];
     for (int d = 0; d < r->ndim; d++) {
       input_idx[dims[d]] = idx[d];
     }
