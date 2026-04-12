@@ -1743,6 +1743,10 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
   return r;
 }
 
+Tensor *expand_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
+  return broadcast_t(mem, a, shape, tar_dim);
+}
+
 static void backward_crossentropy(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
