@@ -757,8 +757,8 @@ static void backward_pow(Tensor *self) {
 
   for (int i = 0; i < N; i++) {
     float x = a->data[offs[0]];
-    a->grad[offs[0]] += self->grad[offs[1]] * pow_exponent *
-                        powf(x, pow_exponent - 1);
+    a->grad[offs[0]] +=
+        self->grad[offs[1]] * pow_exponent * powf(x, pow_exponent - 1);
     advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
@@ -2591,8 +2591,20 @@ void mem_stats(Memory *mem) {
 
 void replace_t(Tensor *a, Tensor *b) {
   CHECK_VOID(check_op_compatibilty(a, b), "replace_t: not compatible");
-  for (int i = 0; i < a->numel; i++) {
-    a->data[i] = b->data[i];
+  if (a->contiguous && b->contiguous) {
+    for (int i = 0; i < a->numel; i++) {
+      a->data[i] = b->data[i];
+    }
+  } else {
+    int N = a->numel;
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[2] = {0, 0};
+    int *strides[2] = {a->strides, b->strides};
+    for (int i = 0; i < N; i++) {
+      a->data[offs[0]] = b->data[offs[1]];
+      advance_offsets(a->ndim, idx, b->shape, 2, offs, strides);
+    }
   }
 }
 
