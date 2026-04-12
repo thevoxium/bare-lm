@@ -1627,6 +1627,10 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
   return r;
 }
 
+Tensor *view_t(Memory *mem, Tensor *a, int *shape, int ndim) {
+  return reshape_t(mem, a, shape, ndim);
+}
+
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim) {
   CHECK(a && dim >= 0 && dim < a->ndim,
         "squeeze_t: a is NULL or dim out of bounds");
