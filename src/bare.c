@@ -1500,17 +1500,6 @@ static void backward_broadcast(Tensor *self) {
   }
 }
 
-// OLD LOGIC BELOW
-/*
-1. Right-align input shape with target shape by padding leading 1s.
-2. For each output index, compute its multi-dimensional index.
-3. For each dimension:
-   - If input dim == 1 → use index 0 (repeat value)
-   - Else → use the same index as output
-4. Map this to input index and copy value. Ignore the extra dim in align shape
-for getting value from a->data Output index → collapse broadcasted dims to 0 →
-read from input.
-*/
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
   CHECK(a && shape && tar_dim >= a->ndim,
         "broadcast_t: a is NULL, shape is NULL, or tar_dim < a->ndim");
@@ -1529,36 +1518,38 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
           "broadcast_t: not compatible");
   }
 
-  Tensor *r = tensor_zeros(mem, shape, tar_dim, TEMP);
-  CHECK(r, "broadcast_t: result tensor failed");
-
-  for (int i = 0; i < r->numel; i++) {
-    int curr = i;
-    int mapped_idx[r->ndim];
-
-    for (int j = r->ndim - 1; j >= 0; j--) {
-      int idx = curr % r->shape[j];
-      curr = curr / r->shape[j];
-
-      if (align_shape[j] == 1) {
-        mapped_idx[j] = 0;
-      } else {
-        mapped_idx[j] = idx;
-      }
-    }
-
-    int a_idx = 0;
-    for (int k = a->ndim - 1; k >= 0; k--) {
-      a_idx += (a->strides[k] * mapped_idx[k + (tar_dim - a->ndim)]);
-    }
-
-    r->data[i] = a->data[a_idx];
+  int numel = 1;
+  for (int i = 0; i < tar_dim; i++) {
+    numel *= shape[i];
   }
 
-  r->op = BROADCAST;
+  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
+  CHECK(r, "broadcast_t: allocate_mem failed");
+  r->data = a->data;
+  r->grad = (float *)allocate_mem(mem, sizeof(float) * numel, TEMP);
+  r->shape = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
+  r->strides = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
+  CHECK(r->grad && r->shape && r->strides,
+        "transpose_t: grad, shape, stride allocation failed");
+  for (int i = 0; i < tar_dim; i++) {
+    r->shape[i] = shape[i];
+  }
+  for (int i = 0; i < tar_dim; i++) {
+    if (align_shape[i] == 1)
+      r->strides[i] = 0;
+    else
+      r->strides[i] = a->strides[i - (tar_dim - a->ndim)];
+  }
+
+  r->ndim = tar_dim;
+  r->numel = numel;
+  r->visited_gen = a->visited_gen;
+  r->contiguous = 0;
+  r->dt = fp32;
   r->parents[0] = a;
   r->parents[1] = NULL;
   r->backward = backward_broadcast;
+  r->op = BROADCAST;
   return r;
 }
 
