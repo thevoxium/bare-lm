@@ -25,7 +25,7 @@ int main() {
 
   // load_checkpoint(pl, "xor.btw");
 
-  for (int epoch = 0; epoch < 5000; epoch++) {
+  for (int epoch = 0; epoch < 500; epoch++) {
     zero_grad(pl);
 
     Tensor *h = linear_t(mem, l1, x);
@@ -36,7 +36,7 @@ int main() {
     Tensor *loss = mseloss_t(mem, o, y);
     backward(mem, loss);
 
-    if (epoch % 100 == 0)
+    if (epoch % 10 == 0)
       printf("epoch %3d  loss=%.4f\n", epoch, loss->data[0]);
 
     sgd_step(pl, 0.1f);

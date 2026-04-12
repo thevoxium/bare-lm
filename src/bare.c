@@ -1468,35 +1468,23 @@ static void backward_broadcast(Tensor *self) {
   int tar_dim = r->ndim;
   int offset = tar_dim - a->ndim;
 
-  int align_shape[tar_dim];
-  for (int i = 0; i < tar_dim; i++) {
-    align_shape[i] = 1;
-  }
-  for (int i = tar_dim - a->ndim; i < tar_dim; i++) {
-    align_shape[i] = a->shape[i - offset];
-  }
-
+  int idx[tar_dim];
+  memset(idx, 0, sizeof(idx));
   for (int i = 0; i < r->numel; i++) {
-    int curr = i;
-    int mapped_idx[r->ndim];
-
-    for (int j = r->ndim - 1; j >= 0; j--) {
-      int idx = curr % r->shape[j];
-      curr = curr / r->shape[j];
-
-      if (align_shape[j] == 1) {
-        mapped_idx[j] = 0;
-      } else {
-        mapped_idx[j] = idx;
+    int a_idx = 0;
+    for (int d = 0; d < tar_dim; d++) {
+      int a_dim = d - offset;
+      if (a_dim >= 0 && a->shape[a_dim] != 1) {
+        a_idx += idx[d] * a->strides[a_dim];
       }
     }
-
-    int a_idx = 0;
-    for (int k = 0; k < a->ndim; k++) {
-      a_idx += a->strides[k] * mapped_idx[k + offset];
-    }
-
     a->grad[a_idx] += r->grad[i];
+    for (int d = r->ndim - 1; d >= 0; d--) {
+      idx[d]++;
+      if (idx[d] < r->shape[d])
+        break;
+      idx[d] = 0;
+    }
   }
 }
 
