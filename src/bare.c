@@ -673,9 +673,9 @@ static void backward_div(Tensor *self) {
 
   if (a->contiguous && b->contiguous && r->contiguous) {
     for (int i = 0; i < N; i++) {
-      a->grad[i] += self->grad[i] / (b->data[i] + 1e-6);
-      b->grad[i] -=
-          self->grad[i] * a->data[i] / (b->data[i] * b->data[i] + 1e-6);
+      float denom = b->data[i] + 1e-6f;
+      a->grad[i] += self->grad[i] / denom;
+      b->grad[i] -= self->grad[i] * a->data[i] / (denom * denom);
     }
     return;
   }
@@ -688,10 +688,10 @@ static void backward_div(Tensor *self) {
 
   for (int i = 0; i < N; i++) {
     float g = r->grad[i];
+    float denom = b->data[b_off] + 1e-6f;
 
-    a->grad[a_off] += g / (b->data[b_off] + 1e-6);
-    b->grad[b_off] -=
-        g * a->data[a_off] / (b->data[b_off] * b->data[b_off] + 1e-6);
+    a->grad[a_off] += g / denom;
+    b->grad[b_off] -= g * a->data[a_off] / (denom * denom);
     for (int d = ndim - 1; d >= 0; d--) {
       idx[d]++;
 
@@ -1403,8 +1403,26 @@ Tensor *transpose_t(Memory *mem, Tensor *a) {
 
 static void backward_reshape(Tensor *self) {
   Tensor *a = self->parents[0];
+  if (a->contiguous) {
+    for (int i = 0; i < self->numel; i++) {
+      a->grad[i] += self->grad[i];
+    }
+    return;
+  }
+
+  int idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  int a_idx = 0;
   for (int i = 0; i < self->numel; i++) {
-    a->grad[i] += self->grad[i];
+    a->grad[a_idx] += self->grad[i];
+    for (int d = a->ndim - 1; d >= 0; d--) {
+      idx[d]++;
+      a_idx += a->strides[d];
+      if (idx[d] < a->shape[d])
+        break;
+      idx[d] = 0;
+      a_idx -= a->shape[d] * a->strides[d];
+    }
   }
 }
 
@@ -1419,8 +1437,26 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
 
   Tensor *r = tensor_zeros(mem, shape, ndim, TEMP);
   CHECK(r, "reshape_t: result tensor failed");
-  for (int i = 0; i < numel; i++) {
-    r->data[i] = a->data[i];
+
+  if (a->contiguous) {
+    for (int i = 0; i < numel; i++) {
+      r->data[i] = a->data[i];
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int a_idx = 0;
+    for (int i = 0; i < numel; i++) {
+      r->data[i] = a->data[a_idx];
+      for (int d = a->ndim - 1; d >= 0; d--) {
+        idx[d]++;
+        a_idx += a->strides[d];
+        if (idx[d] < a->shape[d])
+          break;
+        idx[d] = 0;
+        a_idx -= a->shape[d] * a->strides[d];
+      }
+    }
   }
 
   r->parents[0] = a;
@@ -1518,7 +1554,8 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
   r->shape = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
   r->strides = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
   CHECK(r->grad && r->shape && r->strides,
-        "transpose_t: grad, shape, stride allocation failed");
+        "broadcast_t: grad, shape, stride allocation failed");
+  memset(r->grad, 0, sizeof(float) * numel);
   for (int i = 0; i < tar_dim; i++) {
     r->shape[i] = shape[i];
   }

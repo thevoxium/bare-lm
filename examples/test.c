@@ -10,11 +10,12 @@ int main() {
 
   Tensor *a = tensor_full_like(mem, c, 1.0, TEMP);
   Tensor *out = add_t(mem, a, c);
+
   backward(mem, out);
   print_t(b, 1);
   print_t(c, 0);
   print_t(a, 0);
-
+  print_t(out, 0);
   reset_temp_mem(mem);
   free_global_mem(mem);
   return 0;
