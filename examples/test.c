@@ -5,16 +5,14 @@
 int main() {
   Memory *mem = create_global_mem(1 << 20);
 
-  Tensor *a = tensor_zeros(mem, S(1, 3), 2, PERM);
-  Tensor *t = transpose_t(mem, a);
-  Tensor *b = tensor_full_like(mem, t, 4.0, TEMP);
-  Tensor *out = add_t(mem, b, t);
+  Tensor *b = tensor_randn(mem, S(3), 1, TEMP);
+  Tensor *c = broadcast_t(mem, b, S(4, 3), 2);
+  Tensor *d = permute_t(mem, c, S(1, 0), 2);
 
-  print_t(out, 0);
-
-  backward(mem, out);
-
-  print_t(a, 1);
+  backward(mem, d);
+  print_t(b, 1);
+  print_t(c, 0);
+  print_t(d, 0);
 
   reset_temp_mem(mem);
   free_global_mem(mem);

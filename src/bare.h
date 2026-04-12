@@ -216,6 +216,7 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b);
 Tensor *transpose_t(Memory *mem, Tensor *a);
 Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim);
+Tensor *view_t(Memory *mem, Tensor *a, int *shape, int ndim);
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *unsqueeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim);

@@ -421,6 +421,23 @@ static inline uint8_t check_op_compatibilty(Tensor *a, Tensor *b) {
   return 1;
 }
 
+static inline void advance_offsets(int ndim, int *idx, int *shape, int n_offs,
+                                   int *offs, int **strides) {
+  for (int d = ndim - 1; d >= 0; d--) {
+    idx[d]++;
+    for (int k = 0; k < n_offs; k++) {
+      offs[k] += strides[k][d];
+    }
+    if (idx[d] < shape[d]) {
+      break;
+    }
+    idx[d] = 0;
+    for (int k = 0; k < n_offs; k++) {
+      offs[k] -= shape[d] * strides[k][d];
+    }
+  }
+}
+
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
@@ -439,27 +456,14 @@ static void backward_add(Tensor *self) {
   int ndim = r->ndim;
   int idx[ndim];
   memset(idx, 0, sizeof(idx));
-  int a_off = 0;
-  int b_off = 0;
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, b->strides};
 
   for (int i = 0; i < N; i++) {
     float g = r->grad[i];
-    a->grad[a_off] += g;
-    b->grad[b_off] += g;
-
-    for (int d = ndim - 1; d >= 0; d--) {
-      idx[d]++;
-
-      a_off += a->strides[d];
-      b_off += b->strides[d];
-
-      if (idx[d] < r->shape[d])
-        break;
-
-      idx[d] = 0;
-      a_off -= r->shape[d] * a->strides[d];
-      b_off -= r->shape[d] * b->strides[d];
-    }
+    a->grad[offs[0]] += g;
+    b->grad[offs[1]] += g;
+    advance_offsets(ndim, idx, r->shape, 2, offs, strides);
   }
 }
 
@@ -479,19 +483,11 @@ Tensor *add_t(Memory *mem, Tensor *a, Tensor *b) {
   } else {
     int idx[a->ndim];
     memset(idx, 0, sizeof(idx));
-    int a_idx = 0, b_idx = 0;
+    int offs[2] = {0, 0};
+    int *strides[2] = {a->strides, b->strides};
     for (int i = 0; i < N; i++) {
-      r->data[i] = a->data[a_idx] + b->data[b_idx];
-      for (int d = a->ndim - 1; d >= 0; d--) {
-        idx[d]++;
-        a_idx += a->strides[d];
-        b_idx += b->strides[d];
-        if (idx[d] < r->shape[d])
-          break;
-        idx[d] = 0;
-        a_idx -= r->shape[d] * a->strides[d];
-        b_idx -= r->shape[d] * b->strides[d];
-      }
+      r->data[i] = a->data[offs[0]] + b->data[offs[1]];
+      advance_offsets(a->ndim, idx, r->shape, 2, offs, strides);
     }
   }
 
@@ -520,27 +516,14 @@ static void backward_sub(Tensor *self) {
   int ndim = r->ndim;
   int idx[ndim];
   memset(idx, 0, sizeof(idx));
-  int a_off = 0;
-  int b_off = 0;
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, b->strides};
 
   for (int i = 0; i < N; i++) {
     float g = r->grad[i];
-    a->grad[a_off] += g;
-    b->grad[b_off] -= g;
-
-    for (int d = ndim - 1; d >= 0; d--) {
-      idx[d]++;
-
-      a_off += a->strides[d];
-      b_off += b->strides[d];
-
-      if (idx[d] < r->shape[d])
-        break;
-
-      idx[d] = 0;
-      a_off -= r->shape[d] * a->strides[d];
-      b_off -= r->shape[d] * b->strides[d];
-    }
+    a->grad[offs[0]] += g;
+    b->grad[offs[1]] -= g;
+    advance_offsets(ndim, idx, r->shape, 2, offs, strides);
   }
 }
 
@@ -560,19 +543,11 @@ Tensor *sub_t(Memory *mem, Tensor *a, Tensor *b) {
   } else {
     int idx[a->ndim];
     memset(idx, 0, sizeof(idx));
-    int a_idx = 0, b_idx = 0;
+    int offs[2] = {0, 0};
+    int *strides[2] = {a->strides, b->strides};
     for (int i = 0; i < N; i++) {
-      r->data[i] = a->data[a_idx] - b->data[b_idx];
-      for (int d = a->ndim - 1; d >= 0; d--) {
-        idx[d]++;
-        a_idx += a->strides[d];
-        b_idx += b->strides[d];
-        if (idx[d] < r->shape[d])
-          break;
-        idx[d] = 0;
-        a_idx -= r->shape[d] * a->strides[d];
-        b_idx -= r->shape[d] * b->strides[d];
-      }
+      r->data[i] = a->data[offs[0]] - b->data[offs[1]];
+      advance_offsets(a->ndim, idx, r->shape, 2, offs, strides);
     }
   }
 
@@ -601,27 +576,14 @@ static void backward_mul(Tensor *self) {
   int ndim = r->ndim;
   int idx[ndim];
   memset(idx, 0, sizeof(idx));
-  int a_off = 0;
-  int b_off = 0;
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, b->strides};
 
   for (int i = 0; i < N; i++) {
     float g = r->grad[i];
-    a->grad[a_off] += g * b->data[b_off];
-    b->grad[b_off] += g * a->data[a_off];
-
-    for (int d = ndim - 1; d >= 0; d--) {
-      idx[d]++;
-
-      a_off += a->strides[d];
-      b_off += b->strides[d];
-
-      if (idx[d] < r->shape[d])
-        break;
-
-      idx[d] = 0;
-      a_off -= r->shape[d] * a->strides[d];
-      b_off -= r->shape[d] * b->strides[d];
-    }
+    a->grad[offs[0]] += g * b->data[offs[1]];
+    b->grad[offs[1]] += g * a->data[offs[0]];
+    advance_offsets(ndim, idx, r->shape, 2, offs, strides);
   }
 }
 
@@ -641,19 +603,11 @@ Tensor *mul_t(Memory *mem, Tensor *a, Tensor *b) {
   } else {
     int idx[a->ndim];
     memset(idx, 0, sizeof(idx));
-    int a_idx = 0, b_idx = 0;
+    int offs[2] = {0, 0};
+    int *strides[2] = {a->strides, b->strides};
     for (int i = 0; i < N; i++) {
-      r->data[i] = a->data[a_idx] * b->data[b_idx];
-      for (int d = a->ndim - 1; d >= 0; d--) {
-        idx[d]++;
-        a_idx += a->strides[d];
-        b_idx += b->strides[d];
-        if (idx[d] < r->shape[d])
-          break;
-        idx[d] = 0;
-        a_idx -= r->shape[d] * a->strides[d];
-        b_idx -= r->shape[d] * b->strides[d];
-      }
+      r->data[i] = a->data[offs[0]] * b->data[offs[1]];
+      advance_offsets(a->ndim, idx, r->shape, 2, offs, strides);
     }
   }
 
@@ -673,9 +627,9 @@ static void backward_div(Tensor *self) {
 
   if (a->contiguous && b->contiguous && r->contiguous) {
     for (int i = 0; i < N; i++) {
-      a->grad[i] += self->grad[i] / (b->data[i] + 1e-6);
-      b->grad[i] -=
-          self->grad[i] * a->data[i] / (b->data[i] * b->data[i] + 1e-6);
+      float denom = b->data[i] + 1e-6f;
+      a->grad[i] += self->grad[i] / denom;
+      b->grad[i] -= self->grad[i] * a->data[i] / (denom * denom);
     }
     return;
   }
@@ -683,28 +637,16 @@ static void backward_div(Tensor *self) {
   int ndim = r->ndim;
   int idx[ndim];
   memset(idx, 0, sizeof(idx));
-  int a_off = 0;
-  int b_off = 0;
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, b->strides};
 
   for (int i = 0; i < N; i++) {
     float g = r->grad[i];
+    float denom = b->data[offs[1]] + 1e-6f;
 
-    a->grad[a_off] += g / (b->data[b_off] + 1e-6);
-    b->grad[b_off] -=
-        g * a->data[a_off] / (b->data[b_off] * b->data[b_off] + 1e-6);
-    for (int d = ndim - 1; d >= 0; d--) {
-      idx[d]++;
-
-      a_off += a->strides[d];
-      b_off += b->strides[d];
-
-      if (idx[d] < r->shape[d])
-        break;
-
-      idx[d] = 0;
-      a_off -= r->shape[d] * a->strides[d];
-      b_off -= r->shape[d] * b->strides[d];
-    }
+    a->grad[offs[0]] += g / denom;
+    b->grad[offs[1]] -= g * a->data[offs[0]] / (denom * denom);
+    advance_offsets(ndim, idx, r->shape, 2, offs, strides);
   }
 }
 Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
@@ -723,19 +665,11 @@ Tensor *divide_t(Memory *mem, Tensor *a, Tensor *b) {
   } else {
     int idx[a->ndim];
     memset(idx, 0, sizeof(idx));
-    int a_idx = 0, b_idx = 0;
+    int offs[2] = {0, 0};
+    int *strides[2] = {a->strides, b->strides};
     for (int i = 0; i < N; i++) {
-      r->data[i] = a->data[a_idx] / (b->data[b_idx] + 1e-6);
-      for (int d = a->ndim - 1; d >= 0; d--) {
-        idx[d]++;
-        a_idx += a->strides[d];
-        b_idx += b->strides[d];
-        if (idx[d] < r->shape[d])
-          break;
-        idx[d] = 0;
-        a_idx -= r->shape[d] * a->strides[d];
-        b_idx -= r->shape[d] * b->strides[d];
-      }
+      r->data[i] = a->data[offs[0]] / (b->data[offs[1]] + 1e-6);
+      advance_offsets(a->ndim, idx, r->shape, 2, offs, strides);
     }
   }
 
@@ -750,8 +684,22 @@ static void backward_neg(Tensor *self) {
   Tensor *a = self->parents[0];
 
   int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
+      a->grad[i] -= self->grad[i];
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
   for (int i = 0; i < N; i++) {
-    a->grad[i] -= self->grad[i];
+    a->grad[offs[0]] -= self->grad[offs[1]];
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -763,11 +711,21 @@ Tensor *neg_t(Memory *mem, Tensor *a) {
 
   int N = r->numel;
 
-  float *__restrict__ r_data = r->data;
-  float *__restrict__ a_data = a->data;
-
-  for (int i = 0; i < N; i++) {
-    r_data[i] = -a_data[i];
+  if (a->contiguous) {
+    float *__restrict__ r_data = r->data;
+    float *__restrict__ a_data = a->data;
+    for (int i = 0; i < N; i++) {
+      r_data[i] = -a_data[i];
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      r->data[i] = -a->data[offs[0]];
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -783,28 +741,70 @@ static void backward_pow(Tensor *self) {
   float pow_exponent = self->op_params[0];
 
   int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
+      a->grad[i] +=
+          self->grad[i] * pow_exponent * powf(a->data[i], pow_exponent - 1);
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
   for (int i = 0; i < N; i++) {
-    a->grad[i] +=
-        self->grad[i] * pow_exponent * powf(a->data[i], pow_exponent - 1);
+    float x = a->data[offs[0]];
+    a->grad[offs[0]] +=
+        self->grad[offs[1]] * pow_exponent * powf(x, pow_exponent - 1);
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
 Tensor *pow_t(Memory *mem, Tensor *a, float exponent) {
   CHECK(a, "pow_t: a is NULL");
 
-  for (int i = 0; i < a->numel; i++) {
-    CHECK(!(a->data[i] < 0.0f && exponent != (int)exponent),
-          "pow_t: negative base with non-integer exponent");
-    CHECK(!(a->data[i] == 0.0f && exponent < 0.0f),
-          "pow_t: zero base with negative exponent");
+  if (a->contiguous) {
+    for (int i = 0; i < a->numel; i++) {
+      CHECK(!(a->data[i] < 0.0f && exponent != (int)exponent),
+            "pow_t: negative base with non-integer exponent");
+      CHECK(!(a->data[i] == 0.0f && exponent < 0.0f),
+            "pow_t: zero base with negative exponent");
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < a->numel; i++) {
+      float x = a->data[offs[0]];
+      CHECK(!(x < 0.0f && exponent != (int)exponent),
+            "pow_t: negative base with non-integer exponent");
+      CHECK(!(x == 0.0f && exponent < 0.0f),
+            "pow_t: zero base with negative exponent");
+      advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
+    }
   }
 
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "pow_t: tensor_init failed");
 
   int N = r->numel;
-  for (int i = 0; i < N; i++) {
-    r->data[i] = powf(a->data[i], exponent);
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      r->data[i] = powf(a->data[i], exponent);
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      r->data[i] = powf(a->data[offs[0]], exponent);
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -819,8 +819,22 @@ static void backward_exp(Tensor *self) {
   Tensor *a = self->parents[0];
 
   int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
+      a->grad[i] += self->grad[i] * self->data[i];
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
   for (int i = 0; i < N; i++) {
-    a->grad[i] += self->grad[i] * self->data[i];
+    a->grad[offs[0]] += self->grad[offs[1]] * self->data[offs[1]];
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -831,8 +845,19 @@ Tensor *exp_t(Memory *mem, Tensor *a) {
   CHECK(r, "exp_t: tensor_init failed");
 
   int N = r->numel;
-  for (int i = 0; i < N; i++) {
-    r->data[i] = expf(a->data[i]);
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      r->data[i] = expf(a->data[i]);
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      r->data[i] = expf(a->data[offs[0]]);
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -847,9 +872,25 @@ static void backward_log(Tensor *self) {
   Tensor *a = self->parents[0];
 
   int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
+      CHECK_VOID(a->data[i] != 0.0f, "backward_log: 0.0 denominator");
+      a->grad[i] += self->grad[i] / a->data[i];
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
   for (int i = 0; i < N; i++) {
-    CHECK_VOID(a->data[i] != 0.0f, "backward_log: 0.0 denominator");
-    a->grad[i] += self->grad[i] / a->data[i];
+    float x = a->data[offs[0]];
+    CHECK_VOID(x != 0.0f, "backward_log: 0.0 denominator");
+    a->grad[offs[0]] += self->grad[offs[1]] / x;
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -860,9 +901,22 @@ Tensor *log_t(Memory *mem, Tensor *a) {
   CHECK(r, "log_t: tensor_init failed");
 
   int N = r->numel;
-  for (int i = 0; i < N; i++) {
-    CHECK(a->data > 0, "log_t: negative data");
-    r->data[i] = logf(a->data[i]);
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      CHECK(a->data[i] > 0.0f, "log_t: negative data");
+      r->data[i] = logf(a->data[i]);
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      float x = a->data[offs[0]];
+      CHECK(x > 0.0f, "log_t: negative data");
+      r->data[i] = logf(x);
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -1093,9 +1147,25 @@ Tensor *max_t(Memory *mem, Tensor *a, int dim) {
 
 static void backward_relu(Tensor *self) {
   Tensor *a = self->parents[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a)
+  int N = self->numel;
+
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
       a->grad[i] += self->grad[i] * (a->data[i] > 0.0f ? 1.0f : 0.0f);
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
+  for (int i = 0; i < N; i++) {
+    a->grad[offs[0]] +=
+        self->grad[offs[1]] * (a->data[offs[0]] > 0.0f ? 1.0f : 0.0f);
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -1105,11 +1175,24 @@ Tensor *relu_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "relu_t: tensor_init failed");
 
-  float *__restrict__ r_data = r->data;
-  float *__restrict__ a_data = a->data;
+  int N = r->numel;
 
-  for (int i = 0; i < r->numel; i++) {
-    r_data[i] = a_data[i] > 0.0f ? a_data[i] : 0.0f;
+  if (a->contiguous) {
+    float *__restrict__ r_data = r->data;
+    float *__restrict__ a_data = a->data;
+    for (int i = 0; i < N; i++) {
+      r_data[i] = a_data[i] > 0.0f ? a_data[i] : 0.0f;
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      float x = a->data[offs[0]];
+      r->data[i] = x > 0.0f ? x : 0.0f;
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -1125,8 +1208,9 @@ static void backward_gelu(Tensor *self) {
   static const float SQRT_2_OVER_PI = 0.7978845608028654f;
   static const float COEFF = 0.044715f;
 
-  for (int i = 0; i < self->numel; i++) {
-    if (a) {
+  int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
       float x = a->data[i];
       float x3 = x * x * x;
       float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
@@ -1136,6 +1220,25 @@ static void backward_gelu(Tensor *self) {
       float grad = 0.5f * (1.0f + tanh_inner) + 0.5f * x * sech2 * d_inner;
       a->grad[i] += self->grad[i] * grad;
     }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
+  for (int i = 0; i < N; i++) {
+    float x = a->data[offs[0]];
+    float x3 = x * x * x;
+    float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
+    float tanh_inner = tanhf(inner);
+    float sech2 = 1.0f - tanh_inner * tanh_inner;
+    float d_inner = SQRT_2_OVER_PI * (1.0f + 3.0f * COEFF * x * x);
+    float grad = 0.5f * (1.0f + tanh_inner) + 0.5f * x * sech2 * d_inner;
+    a->grad[offs[0]] += self->grad[offs[1]] * grad;
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -1148,11 +1251,26 @@ Tensor *gelu_t(Memory *mem, Tensor *a) {
   static const float SQRT_2_OVER_PI = 0.7978845608028654f;
   static const float COEFF = 0.044715f;
 
-  for (int i = 0; i < r->numel; i++) {
-    float x = a->data[i];
-    float x3 = x * x * x;
-    float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
-    r->data[i] = 0.5f * x * (1.0f + tanhf(inner));
+  int N = r->numel;
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      float x = a->data[i];
+      float x3 = x * x * x;
+      float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
+      r->data[i] = 0.5f * x * (1.0f + tanhf(inner));
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      float x = a->data[offs[0]];
+      float x3 = x * x * x;
+      float inner = SQRT_2_OVER_PI * (x + COEFF * x3);
+      r->data[i] = 0.5f * x * (1.0f + tanhf(inner));
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -1165,11 +1283,26 @@ Tensor *gelu_t(Memory *mem, Tensor *a) {
 
 static void backward_sigmoid(Tensor *self) {
   Tensor *a = self->parents[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a) {
+  int N = self->numel;
+
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
       float sig = self->data[i];
       a->grad[i] += self->grad[i] * sig * (1.0f - sig);
     }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
+  for (int i = 0; i < N; i++) {
+    float sig = self->data[offs[1]];
+    a->grad[offs[0]] += self->grad[offs[1]] * sig * (1.0f - sig);
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -1179,8 +1312,21 @@ Tensor *sigmoid_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "sigmoid_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
-    r->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
+  int N = r->numel;
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      r->data[i] = 1.0f / (1.0f + expf(-a->data[i]));
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      float x = a->data[offs[0]];
+      r->data[i] = 1.0f / (1.0f + expf(-x));
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -1193,11 +1339,26 @@ Tensor *sigmoid_t(Memory *mem, Tensor *a) {
 
 static void backward_tanh(Tensor *self) {
   Tensor *a = self->parents[0];
-  for (int i = 0; i < self->numel; i++) {
-    if (a) {
+  int N = self->numel;
+
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
       float th = self->data[i];
       a->grad[i] += self->grad[i] * (1.0f - th * th);
     }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
+  for (int i = 0; i < N; i++) {
+    float th = self->data[offs[1]];
+    a->grad[offs[0]] += self->grad[offs[1]] * (1.0f - th * th);
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
 
@@ -1207,8 +1368,20 @@ Tensor *tanh_t(Memory *mem, Tensor *a) {
   Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "tanh_t: tensor_init failed");
 
-  for (int i = 0; i < r->numel; i++) {
-    r->data[i] = tanhf(a->data[i]);
+  int N = r->numel;
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      r->data[i] = tanhf(a->data[i]);
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      r->data[i] = tanhf(a->data[offs[0]]);
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -1403,8 +1576,20 @@ Tensor *transpose_t(Memory *mem, Tensor *a) {
 
 static void backward_reshape(Tensor *self) {
   Tensor *a = self->parents[0];
+  if (a->contiguous) {
+    for (int i = 0; i < self->numel; i++) {
+      a->grad[i] += self->grad[i];
+    }
+    return;
+  }
+
+  int idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[1] = {0};
+  int *strides[1] = {a->strides};
   for (int i = 0; i < self->numel; i++) {
-    a->grad[i] += self->grad[i];
+    a->grad[offs[0]] += self->grad[i];
+    advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
   }
 }
 
@@ -1419,8 +1604,20 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
 
   Tensor *r = tensor_zeros(mem, shape, ndim, TEMP);
   CHECK(r, "reshape_t: result tensor failed");
-  for (int i = 0; i < numel; i++) {
-    r->data[i] = a->data[i];
+
+  if (a->contiguous) {
+    for (int i = 0; i < numel; i++) {
+      r->data[i] = a->data[i];
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < numel; i++) {
+      r->data[i] = a->data[offs[0]];
+      advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
+    }
   }
 
   r->parents[0] = a;
@@ -1428,6 +1625,10 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
   r->op = RESHAPE;
   r->backward = backward_reshape;
   return r;
+}
+
+Tensor *view_t(Memory *mem, Tensor *a, int *shape, int ndim) {
+  return reshape_t(mem, a, shape, ndim);
 }
 
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim) {
@@ -1468,49 +1669,26 @@ static void backward_broadcast(Tensor *self) {
   int tar_dim = r->ndim;
   int offset = tar_dim - a->ndim;
 
-  int align_shape[tar_dim];
-  for (int i = 0; i < tar_dim; i++) {
-    align_shape[i] = 1;
-  }
-  for (int i = tar_dim - a->ndim; i < tar_dim; i++) {
-    align_shape[i] = a->shape[i - offset];
-  }
-
+  int idx[tar_dim];
+  memset(idx, 0, sizeof(idx));
   for (int i = 0; i < r->numel; i++) {
-    int curr = i;
-    int mapped_idx[r->ndim];
-
-    for (int j = r->ndim - 1; j >= 0; j--) {
-      int idx = curr % r->shape[j];
-      curr = curr / r->shape[j];
-
-      if (align_shape[j] == 1) {
-        mapped_idx[j] = 0;
-      } else {
-        mapped_idx[j] = idx;
+    int a_idx = 0;
+    for (int d = 0; d < tar_dim; d++) {
+      int a_dim = d - offset;
+      if (a_dim >= 0 && a->shape[a_dim] != 1) {
+        a_idx += idx[d] * a->strides[a_dim];
       }
     }
-
-    int a_idx = 0;
-    for (int k = 0; k < a->ndim; k++) {
-      a_idx += a->strides[k] * mapped_idx[k + offset];
-    }
-
     a->grad[a_idx] += r->grad[i];
+    for (int d = r->ndim - 1; d >= 0; d--) {
+      idx[d]++;
+      if (idx[d] < r->shape[d])
+        break;
+      idx[d] = 0;
+    }
   }
 }
 
-// OLD LOGIC BELOW
-/*
-1. Right-align input shape with target shape by padding leading 1s.
-2. For each output index, compute its multi-dimensional index.
-3. For each dimension:
-   - If input dim == 1 → use index 0 (repeat value)
-   - Else → use the same index as output
-4. Map this to input index and copy value. Ignore the extra dim in align shape
-for getting value from a->data Output index → collapse broadcasted dims to 0 →
-read from input.
-*/
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
   CHECK(a && shape && tar_dim >= a->ndim,
         "broadcast_t: a is NULL, shape is NULL, or tar_dim < a->ndim");
@@ -1529,36 +1707,39 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
           "broadcast_t: not compatible");
   }
 
-  Tensor *r = tensor_zeros(mem, shape, tar_dim, TEMP);
-  CHECK(r, "broadcast_t: result tensor failed");
-
-  for (int i = 0; i < r->numel; i++) {
-    int curr = i;
-    int mapped_idx[r->ndim];
-
-    for (int j = r->ndim - 1; j >= 0; j--) {
-      int idx = curr % r->shape[j];
-      curr = curr / r->shape[j];
-
-      if (align_shape[j] == 1) {
-        mapped_idx[j] = 0;
-      } else {
-        mapped_idx[j] = idx;
-      }
-    }
-
-    int a_idx = 0;
-    for (int k = a->ndim - 1; k >= 0; k--) {
-      a_idx += (a->strides[k] * mapped_idx[k + (tar_dim - a->ndim)]);
-    }
-
-    r->data[i] = a->data[a_idx];
+  int numel = 1;
+  for (int i = 0; i < tar_dim; i++) {
+    numel *= shape[i];
   }
 
-  r->op = BROADCAST;
+  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
+  CHECK(r, "broadcast_t: allocate_mem failed");
+  r->data = a->data;
+  r->grad = (float *)allocate_mem(mem, sizeof(float) * numel, TEMP);
+  r->shape = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
+  r->strides = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
+  CHECK(r->grad && r->shape && r->strides,
+        "broadcast_t: grad, shape, stride allocation failed");
+  memset(r->grad, 0, sizeof(float) * numel);
+  for (int i = 0; i < tar_dim; i++) {
+    r->shape[i] = shape[i];
+  }
+  for (int i = 0; i < tar_dim; i++) {
+    if (align_shape[i] == 1)
+      r->strides[i] = 0;
+    else
+      r->strides[i] = a->strides[i - (tar_dim - a->ndim)];
+  }
+
+  r->ndim = tar_dim;
+  r->numel = numel;
+  r->visited_gen = a->visited_gen;
+  r->contiguous = 0;
+  r->dt = fp32;
   r->parents[0] = a;
   r->parents[1] = NULL;
   r->backward = backward_broadcast;
+  r->op = BROADCAST;
   return r;
 }
 
@@ -2076,18 +2257,17 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
 
   Tensor *r = tensor_zeros(mem, out_shape, total_dim, TEMP);
   CHECK(r, "permute_t: failed to create result tensor");
-
+  int idx[r->ndim];
+  int input_idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  memset(input_idx, 0, sizeof(input_idx));
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
-    int idx[r->ndim];
-
     for (int d = r->ndim - 1; d >= 0; d--) {
       idx[d] = curr % r->shape[d];
       curr /= r->shape[d];
     }
-
     int a_idx = 0;
-    int input_idx[a->ndim];
     for (int d = 0; d < r->ndim; d++) {
       input_idx[dims[d]] = idx[d];
     }
@@ -2122,21 +2302,21 @@ static void backward_softmax(Tensor *self) {
       curr /= r->shape[d];
     }
 
-    int a_idx = 0;
+    int offset = 0;
     for (int d = 0; d < a->ndim; d++) {
       if (d != dim) {
-        a_idx += (idx[d] * a->strides[d]);
+        offset += (idx[d] * a->strides[d]);
       }
     }
 
     float sum = 0.0f;
     for (int k = 0; k < r->shape[dim]; k++) {
-      int final_idx = a_idx + k * a->strides[dim];
+      int final_idx = offset + k * a->strides[dim];
       sum += r->grad[final_idx] * r->data[final_idx];
     }
 
     int k = idx[dim];
-    int final_idx = a_idx + k * a->strides[dim];
+    int final_idx = offset + k * a->strides[dim];
     float data = r->data[final_idx];
     a->grad[final_idx] += data * (r->grad[final_idx] - sum);
   }
@@ -2149,34 +2329,34 @@ Tensor *softmax_t(Memory *mem, Tensor *a, int dim) {
   Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
   CHECK(r, "softmax_t: failed to create result tensor");
 
+  int idx[r->ndim];
+  memset(idx, 0, sizeof(idx));
   for (int i = 0; i < r->numel; i++) {
     int curr = i;
-    int idx[a->ndim];
     for (int d = r->ndim - 1; d >= 0; d--) {
       idx[d] = curr % r->shape[d];
       curr /= r->shape[d];
     }
-
-    int a_idx = 0;
-    for (int d = 0; d < a->ndim; d++) {
-      if (d != dim) {
-        a_idx += (idx[d] * a->strides[d]);
-      }
+    int offset = 0;
+    for (int d = 0; d < r->ndim; d++) {
+      if (d == dim)
+        continue;
+      offset += idx[d] * a->strides[d];
     }
 
-    float m = -1e10;
+    float m = -INFINITY;
     for (int k = 0; k < r->shape[dim]; k++) {
-      float v = a->data[a_idx + k * a->strides[dim]];
+      float v = a->data[offset + k * a->strides[dim]];
       if (m < v)
         m = v;
     }
+
     float sum = 0.0f;
     for (int k = 0; k < r->shape[dim]; k++) {
-      sum += (expf(a->data[a_idx + k * a->strides[dim]] - m));
+      sum += expf(a->data[offset + k * a->strides[dim]] - m);
     }
 
-    int k = idx[dim];
-    r->data[i] = expf(a->data[a_idx + k * a->strides[dim]] - m) / sum;
+    r->data[i] = expf(a->data[offset + idx[dim] * a->strides[dim]] - m) / sum;
   }
 
   r->op = SOFTMAX;
@@ -2414,8 +2594,20 @@ void mem_stats(Memory *mem) {
 
 void replace_t(Tensor *a, Tensor *b) {
   CHECK_VOID(check_op_compatibilty(a, b), "replace_t: not compatible");
-  for (int i = 0; i < a->numel; i++) {
-    a->data[i] = b->data[i];
+  if (a->contiguous && b->contiguous) {
+    for (int i = 0; i < a->numel; i++) {
+      a->data[i] = b->data[i];
+    }
+  } else {
+    int N = a->numel;
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[2] = {0, 0};
+    int *strides[2] = {a->strides, b->strides};
+    for (int i = 0; i < N; i++) {
+      a->data[offs[0]] = b->data[offs[1]];
+      advance_offsets(a->ndim, idx, b->shape, 2, offs, strides);
+    }
   }
 }
 
