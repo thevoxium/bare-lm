@@ -220,6 +220,7 @@ Tensor *view_t(Memory *mem, Tensor *a, int *shape, int ndim);
 Tensor *squeeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *unsqueeze_t(Memory *mem, Tensor *a, int dim);
 Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim);
+Tensor *expand_t(Memory *mem, Tensor *a, int *shape, int tar_dim);
 Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val);
 Tensor *scale_t(Memory *mem, Tensor *a, float v);
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);

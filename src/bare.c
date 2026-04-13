@@ -1743,6 +1743,10 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
   return r;
 }
 
+Tensor *expand_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
+  return broadcast_t(mem, a, shape, tar_dim);
+}
+
 static void backward_crossentropy(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
@@ -2218,73 +2222,44 @@ static void backward_permute(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *r = self;
 
-  int dims[r->ndim];
-  for (int i = 0; i < a->ndim; i++) {
-    dims[i] = r->op_params[i];
-  }
-
-  for (int i = 0; i < r->numel; i++) {
-    int curr = i;
-    int idx[r->ndim];
-
-    for (int d = r->ndim - 1; d >= 0; d--) {
-      idx[d] = curr % r->shape[d];
-      curr /= r->shape[d];
-    }
-
-    int a_idx = 0;
-    int input_idx[a->ndim];
-    for (int d = 0; d < r->ndim; d++) {
-      input_idx[dims[d]] = idx[d];
-    }
-
-    for (int d = 0; d < a->ndim; d++) {
-      a_idx += (input_idx[d] * a->strides[d]);
-    }
-
-    a->grad[a_idx] += (self->grad[i]);
+  int idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[1] = {0};
+  int N = r->numel;
+  int *strides[1] = {r->strides};
+  for (int i = 0; i < N; i++) {
+    a->grad[offs[0]] += r->grad[offs[0]];
+    advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
   }
 }
 
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
-  CHECK(a && dims && total_dim <= 4 && total_dim == a->ndim,
+  CHECK(a && dims && total_dim == a->ndim,
         "permute_t: a is NULL, dims is NULL, or invalid dimensions");
 
-  int out_shape[a->ndim];
-  for (int i = 0; i < a->ndim; i++) {
-    out_shape[i] = a->shape[dims[i]];
+  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
+  CHECK(r, "permute_t: allocate_mem failed");
+  r->data = a->data;
+  r->grad = (float *)allocate_mem(mem, sizeof(float) * a->numel, TEMP);
+  memset(r->grad, 0, sizeof(float) * a->numel);
+  r->shape = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
+  r->strides = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
+  CHECK(r->grad && r->shape && r->strides,
+        "transpose_t: grad, shape, stride allocation failed");
+
+  for (int i = 0; i < total_dim; i++) {
+    r->shape[i] = a->shape[dims[i]];
+    r->strides[i] = a->strides[dims[i]];
   }
 
-  Tensor *r = tensor_zeros(mem, out_shape, total_dim, TEMP);
-  CHECK(r, "permute_t: failed to create result tensor");
-  int idx[r->ndim];
-  int input_idx[a->ndim];
-  memset(idx, 0, sizeof(idx));
-  memset(input_idx, 0, sizeof(input_idx));
-  for (int i = 0; i < r->numel; i++) {
-    int curr = i;
-    for (int d = r->ndim - 1; d >= 0; d--) {
-      idx[d] = curr % r->shape[d];
-      curr /= r->shape[d];
-    }
-    int a_idx = 0;
-    for (int d = 0; d < r->ndim; d++) {
-      input_idx[dims[d]] = idx[d];
-    }
-
-    for (int d = 0; d < a->ndim; d++) {
-      a_idx += (input_idx[d] * a->strides[d]);
-    }
-
-    r->data[i] = a->data[a_idx];
-  }
-
+  r->ndim = a->ndim;
+  r->numel = a->numel;
+  r->visited_gen = a->visited_gen;
+  r->contiguous = 0;
+  r->dt = fp32;
   r->op = PERMUTE;
   r->parents[0] = a;
   r->parents[1] = NULL;
-  for (int i = 0; i < total_dim; i++) {
-    r->op_params[i] = dims[i];
-  }
   r->backward = backward_permute;
   return r;
 }
