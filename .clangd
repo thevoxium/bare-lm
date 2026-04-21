@@ -1,3 +1,0 @@
-CompileFlags:
-  Remove: [-march=native]
-  Add: [--target=arm64-apple-darwin]

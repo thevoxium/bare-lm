@@ -1,5 +1,6 @@
 build/
 todo.md
+.clangd
 main.c
 .ignore
 gpt2.c
