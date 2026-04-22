@@ -1833,10 +1833,10 @@ Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out) {
 
   int weight_shape[] = {d_out, d_in};
   int bias_shape[] = {d_out};
-  l->weights = tensor_randn(mem, weight_shape, 2, PERM);
+  l->weights = tensor_xavier(mem, weight_shape, 2, PERM);
   CHECK(l->weights, "create_linear: failed to create weights tensor");
 
-  l->bias = tensor_randn(mem, bias_shape, 1, PERM);
+  l->bias = tensor_zeros(mem, bias_shape, 1, PERM);
   CHECK(l->bias, "create_linear: failed to create bias tensor");
 
   param_list_add(mem, pl, l->weights);
