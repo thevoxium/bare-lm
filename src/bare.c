@@ -1,5 +1,6 @@
 #include "bare.h"
 #include <cblas.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -881,6 +882,111 @@ Tensor *exp_t(Memory *mem, Tensor *a) {
   r->parents[1] = NULL;
   r->op = EXP;
   r->backward = backward_exp;
+
+  return r;
+}
+
+static void backward_cos(Tensor *self) {
+  Tensor *a = self->parents[0];
+
+  int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
+      a->grad[i] += self->grad[i] * (-sin(self->data[i]));
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
+  for (int i = 0; i < N; i++) {
+    a->grad[offs[0]] += self->grad[offs[1]] * (-sin(a->data[offs[1]]));
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
+  }
+}
+
+Tensor *cos_t(Memory *mem, Tensor *a) {
+  CHECK(a, "cos_t: a is NULL");
+
+  Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
+  CHECK(r, "cos_t: tensor_init failed");
+
+  int N = r->numel;
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      r->data[i] = cos(a->data[i]);
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      r->data[i] = cos(a->data[offs[0]]);
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = COS;
+  r->backward = backward_cos;
+
+  return r;
+}
+static void backward_sin(Tensor *self) {
+  Tensor *a = self->parents[0];
+
+  int N = self->numel;
+  if (a->contiguous && self->contiguous) {
+    for (int i = 0; i < N; i++) {
+      a->grad[i] += self->grad[i] * cos(self->data[i]);
+    }
+    return;
+  }
+
+  int ndim = self->ndim;
+  int idx[ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[2] = {0, 0};
+  int *strides[2] = {a->strides, self->strides};
+
+  for (int i = 0; i < N; i++) {
+    a->grad[offs[0]] += self->grad[offs[1]] * cos(a->data[offs[1]]);
+    advance_offsets(ndim, idx, self->shape, 2, offs, strides);
+  }
+}
+
+Tensor *sin_t(Memory *mem, Tensor *a) {
+  CHECK(a, "sin_t: a is NULL");
+
+  Tensor *r = tensor_init(mem, a->shape, a->ndim, TEMP);
+  CHECK(r, "sin_t: tensor_init failed");
+
+  int N = r->numel;
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      r->data[i] = sin(a->data[i]);
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < N; i++) {
+      r->data[i] = sin(a->data[offs[0]]);
+      advance_offsets(a->ndim, idx, r->shape, 1, offs, strides);
+    }
+  }
+
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = SIN;
+  r->backward = backward_sin;
 
   return r;
 }

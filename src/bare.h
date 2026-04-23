@@ -68,6 +68,8 @@ typedef enum Op {
   PERMUTE,
   SOFTMAX,
   EMBEDDING,
+  SIN,
+  COS,
 } Op;
 
 typedef enum DType {
@@ -191,7 +193,8 @@ Tensor *tensor_full_like(Memory *mem, Tensor *a, float fill_value,
 Tensor *tensor_zeros_like(Memory *mem, Tensor *a, uint8_t perm);
 Tensor *tensor_ones_like(Memory *mem, Tensor *a, uint8_t perm);
 Tensor *tensor_randn_like(Memory *mem, Tensor *a, uint8_t perm);
-Tensor *tensor_arange(Memory *mem, float start, float stop, float step, uint8_t perm);
+Tensor *tensor_arange(Memory *mem, float start, float stop, float step,
+                      uint8_t perm);
 void print_t(Tensor *t, uint8_t grad);
 void zero_grad(ParameterList *pl);
 
@@ -203,6 +206,8 @@ Tensor *neg_t(Memory *mem, Tensor *a);
 Tensor *pow_t(Memory *mem, Tensor *a, float exponent);
 Tensor *exp_t(Memory *mem, Tensor *a);
 Tensor *log_t(Memory *mem, Tensor *a);
+Tensor *sin_t(Memory *mem, Tensor *a);
+Tensor *cos_t(Memory *mem, Tensor *a);
 Tensor *sum_t(Memory *mem, Tensor *a, int dim);
 Tensor *mean_t(Memory *mem, Tensor *a, int dim);
 Tensor *dot_t(Memory *mem, Tensor *a, Tensor *b);
