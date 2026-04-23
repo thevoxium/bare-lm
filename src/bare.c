@@ -409,6 +409,23 @@ Tensor *tensor_randn_like(Memory *mem, Tensor *a, uint8_t perm) {
   return tensor_randn(mem, a->shape, a->ndim, perm);
 }
 
+Tensor *tensor_arange(Memory *mem, float start, float stop, float step,
+                      uint8_t perm) {
+  CHECK(step != 0.0f, "tensor_arange: step cannot be zero");
+
+  int numel = (int)ceilf((stop - start) / step);
+  CHECK(numel > 0, "tensor_arange: resulting numel must be positive");
+
+  Tensor *r = tensor_init(mem, S(numel), 1, perm);
+  CHECK(r, "tensor_arange: tensor_init failed");
+
+  for (int i = 0; i < numel; i++) {
+    r->data[i] = start + (float)i * step;
+  }
+
+  return r;
+}
+
 static inline uint8_t check_op_compatibilty(Tensor *a, Tensor *b) {
   if (!a || !b || a->ndim != b->ndim) {
     return 0;
