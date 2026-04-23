@@ -36,25 +36,6 @@ void parse_csv(FILE *fp, Tensor *input, Tensor *output) {
   }
 }
 
-Pair_T get_batch(Memory *mem, int batch_size, Tensor *input, Tensor *output) {
-  Pair_T result;
-
-  result.F = tensor_init(mem, S(batch_size, TRAIN_COLS), 2, TEMP);
-  result.S = tensor_init(mem, S(batch_size, LABELS), 2, TEMP);
-
-  for (int i = 0; i < batch_size; i++) {
-    int num = rand() % TRAIN_ROWS;
-    for (int j = 0; j < TRAIN_COLS; j++) {
-      result.F->data[i * TRAIN_COLS + j] = input->data[num * TRAIN_COLS + j];
-    }
-    for (int j = 0; j < LABELS; j++) {
-      result.S->data[i * LABELS + j] = output->data[num * LABELS + j];
-    }
-  }
-
-  return result;
-}
-
 int get_max_index(float *data, int size) {
   int max_idx = 0;
   for (int i = 1; i < size; i++) {
@@ -97,7 +78,7 @@ int main() {
   int hidden1 = 512;
   int hidden2 = 256;
   int hidden3 = 128;
-  int steps = 10000;
+  int steps = 1000;
   int batch_size = 128;
   Linear *l1 = create_linear(mem, pl, TRAIN_COLS, hidden1);
   Linear *l2 = create_linear(mem, pl, hidden1, hidden2);

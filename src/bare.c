@@ -2591,3 +2591,26 @@ void detach_t(Tensor *a) {
   a->parents[0] = NULL;
   a->parents[1] = NULL;
 }
+
+Pair_T get_batch(Memory *mem, int batch_size, Tensor *input, Tensor *output) {
+  Pair_T result;
+
+  int input_cols = input->shape[1];
+  int input_rows = input->shape[0];
+  int output_cols = output->shape[1];
+
+  result.F = tensor_init(mem, S(batch_size, input_cols), 2, TEMP);
+  result.S = tensor_init(mem, S(batch_size, ), 2, TEMP);
+
+  for (int i = 0; i < batch_size; i++) {
+    int num = rand() % input_rows;
+    for (int j = 0; j < input_cols; j++) {
+      result.F->data[i * input_cols + j] = input->data[num * input_cols + j];
+    }
+    for (int j = 0; j < output_cols; j++) {
+      result.S->data[i * output_cols + j] = output->data[num * output_cols + j];
+    }
+  }
+
+  return result;
+}

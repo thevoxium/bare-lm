@@ -238,4 +238,6 @@ void load_checkpoint(ParameterList *pl, const char *path);
 
 void mem_stats(Memory *mem);
 
+Pair_T get_batch(Memory *mem, int batch_size, Tensor *input, Tensor *output);
+
 #endif //! BARE_H
