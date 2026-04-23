@@ -4,14 +4,80 @@ A minimal autograd tensor library in C. Arena-based memory, zero dependencies be
 
 NOTE: examples & API will CHANGE a lot. This is under active developement.
 
-## Build & Run
+## Build & Run (Cross-Platform)
 
-I suggest that you please have gcc-15 installed, much easier to use instead of clang for now (although I just need to change the Makefile somehow, but will do that later on)
+This project depends on:
+- A C compiler (`cc`, `gcc`, or `clang`)
+- `make`
+- OpenBLAS (headers + library)
+- `pkg-config` (recommended, for auto-detecting OpenBLAS)
+- Optional: `valgrind` for memory checks
+
+### 1) Install dependencies
+
+#### macOS (Homebrew)
 
 ```bash
-make run FILE=main.c CC=gcc-15        # build and run
-make asan FILE=main.c CC=gcc-15       # run with address + undefined behavior sanitizer
+brew install gcc openblas pkg-config
+# optional
+brew install valgrind
 ```
+
+If `cc` on your machine does not work as expected, try GCC explicitly:
+
+```bash
+make run FILE=examples/xor.c CC=gcc-15
+```
+
+#### Ubuntu / Debian
+
+```bash
+sudo apt update
+sudo apt install -y build-essential libopenblas-dev pkg-config valgrind
+```
+
+#### Windows
+
+Use WSL (Ubuntu/Debian) and follow the Linux steps above.
+
+### 2) See available Make targets
+
+```bash
+make help
+```
+
+### 3) Common commands
+
+```bash
+make run FILE=examples/xor.c               # build and run
+make asan FILE=examples/xor.c              # address + undefined behavior sanitizers
+make time FILE=examples/xor.c              # run with timing
+make valgrind FILE=examples/xor.c          # run with valgrind
+make test                                  # compile and run examples/test.c
+make clean                                 # remove build artifacts
+```
+
+### 4) Useful overrides
+
+```bash
+make run FILE=examples/xor.c CC=gcc        # choose compiler
+make run FILE=examples/xor.c perf=1        # enable -O3 -march=native -ffast-math
+```
+
+If OpenBLAS is installed in a non-standard location and `pkg-config` cannot find it:
+
+```bash
+make run FILE=examples/xor.c OPENBLAS_PATH=/path/to/openblas
+```
+
+### 5) Troubleshooting
+
+- `fatal error: cblas.h: No such file or directory`
+  - Install OpenBLAS dev headers (`libopenblas-dev` on Linux, `openblas` on Homebrew).
+- Linker error for `-lopenblas`
+  - Install OpenBLAS and ensure library paths are visible, or set `OPENBLAS_PATH=...`.
+- `valgrind` not found
+  - Install `valgrind`, or skip the `make valgrind` target.
 
 ## Example: XOR with a 2-layer MLP
 
