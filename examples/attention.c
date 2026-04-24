@@ -99,6 +99,12 @@ Tensor *multi_head_attention(Memory *mem, Tensor *x, Linear *wq, Linear *wk,
   return out_final;
 }
 
+Tensor *add_norm(Memory *mem, Tensor *x, Tensor *sub_layer, LayerNorm *norm) {
+  Tensor *out = add_t(mem, x, sub_layer);
+  out = layernorm_t(mem, norm, out);
+  return out;
+}
+
 int main() {
   Memory *mem = create_global_mem(1ULL * 10 * 1024 * 1024 * 1024);
   ParameterList *pl = create_param_list(mem);
@@ -123,8 +129,13 @@ int main() {
   Linear *wv = create_linear(mem, pl, D, D);
   Linear *wo = create_linear(mem, pl, D, D);
 
-  Tensor *out = multi_head_attention(mem, x, wq, wk, wv, wo, NULL);
+  // Tensor *out = multi_head_attention(mem, x, wq, wk, wv, wo, NULL);
 
+  Tensor *sub_layer = tensor_xavier(mem, S(B, T, D), 3, PERM);
+  LayerNorm *l = create_layernorm(mem, pl, D, 1e-5);
+  Tensor *out = add_norm(mem, x, sub_layer, l);
+
+  print_tensor_shape(out);
   free_global_mem(mem);
   return 0;
 }
