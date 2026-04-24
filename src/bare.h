@@ -180,6 +180,7 @@ int element_size(Tensor *a);
 int nbytes(Tensor *a);
 uint8_t is_floating_point(Tensor *a);
 int *tensor_size(Memory *mem, Tensor *a);
+void print_tensor_shape(Tensor *a);
 float item(Tensor *a);
 
 Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm);

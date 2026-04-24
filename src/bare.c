@@ -2737,3 +2737,15 @@ Pair_T get_batch(Memory *mem, int batch_size, Tensor *input, Tensor *output) {
 
   return result;
 }
+
+void print_tensor_shape(Tensor *a) {
+  CHECK_VOID(a, "print_tensor_shape: tensor is null");
+  printf("(");
+  for (int i = 0; i < a->ndim; i++) {
+    if (i != a->ndim - 1)
+      printf("%d, ", a->shape[i]);
+    else
+      printf("%d", a->shape[i]);
+  }
+  printf(")");
+}
