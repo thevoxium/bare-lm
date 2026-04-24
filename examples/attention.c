@@ -65,9 +65,11 @@ Pair_T scaled_dot_product_attention(Memory *mem, Tensor *Q, Tensor *K,
 }
 
 Tensor *feed_forward(Memory *mem, Tensor *x, Linear *w1, Linear *w2) {
-  Tensor *out = linear_t(mem, w1, x);
+  Tensor *x_ = reshape_t(mem, x, S(B * T, D), 2);
+  Tensor *out = linear_t(mem, w1, x_);
   out = relu_t(mem, out);
   out = linear_t(mem, w2, out);
+  out = reshape_t(mem, out, S(B, T, D), 3);
   return out;
 }
 
