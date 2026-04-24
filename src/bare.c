@@ -2077,7 +2077,7 @@ static void backward_mask(Tensor *self) {
   Tensor *b = self->parents[1];
 
   for (int i = 0; i < a->numel; i++) {
-    if (b->data[i] == 0) {
+    if (b->data[i] != 0) {
       a->grad[i] += (self->grad[i]);
     }
   }
@@ -2091,13 +2091,12 @@ Tensor *mask_t(Memory *mem, Tensor *a, Tensor *b, float val) {
   CHECK(r, "mask_t: tensor_zeros failed");
 
   for (int i = 0; i < a->numel; i++) {
-    if (b->data[i] == 1) {
+    if (b->data[i] == 0) {
       r->data[i] = val;
     } else {
       r->data[i] = a->data[i];
     }
   }
-
   r->op = MASK;
   r->parents[0] = a;
   r->parents[1] = b;
@@ -2747,5 +2746,5 @@ void print_tensor_shape(Tensor *a) {
     else
       printf("%d", a->shape[i]);
   }
-  printf(")");
+  printf(")\n");
 }
