@@ -11,6 +11,24 @@
 #define Vocab 64
 #define D_ff 32
 
+Tensor *generate_causal_mask(Memory *mem) {
+  Tensor *mask = tensor_zeros(mem, S(B, H, T, T), 4, PERM);
+  CHECK(mask, "generate_causal_mask: failed to create mask tensor");
+
+  for (int b = 0; b < B; b++) {
+    for (int h = 0; h < H; h++) {
+      for (int i = 0; i < T; i++) {
+        for (int j = i + 1; j < T; j++) {
+          int idx = b * H * T * T + h * T * T + i * T + j;
+          mask->data[idx] = 1.0f;
+        }
+      }
+    }
+  }
+  detach_t(mask);
+  return mask;
+}
+
 Tensor *create_positional_encodings(Memory *mem) {
   CHECK(D % 2 == 0, "create_positional_encodings: D should be even");
 
@@ -105,6 +123,52 @@ Tensor *add_norm(Memory *mem, Tensor *x, Tensor *sub_layer, LayerNorm *norm) {
   return out;
 }
 
+Tensor *encoder(Memory *mem, Tensor *x, Linear *wq, Linear *wk, Linear *wv,
+                Linear *wo, Linear *w1, Linear *w2, LayerNorm *norm1,
+                LayerNorm *norm2, Tensor *mask) {
+  Tensor *attn_out = multi_head_attention(mem, x, wq, wk, wv, wo, mask);
+  Tensor *x_ = add_norm(mem, x, attn_out, norm1);
+  Tensor *ff_out = feed_forward(mem, x_, w1, w2);
+  Tensor *final = add_norm(mem, x, ff_out, norm2);
+  return final;
+}
+
+Tensor *decoder(Memory *mem, Tensor *x, Tensor *enc_out, Tensor *tgt_mask,
+                Tensor *src_mask, Linear *wq1, Linear *wk1, Linear *wv1,
+                Linear *wo1, Linear *wq2, Linear *wk2, Linear *wv2, Linear *wo2,
+                Linear *w1, Linear *w2, LayerNorm *norm1, LayerNorm *norm2,
+                LayerNorm *norm3) {
+  Tensor *attn1 = multi_head_attention(mem, x, wq1, wk1, wv1, wo1, tgt_mask);
+  Tensor *x_ = add_norm(mem, x, attn1, norm1);
+
+  Tensor *x_new = reshape_t(mem, x, S(B * T, D), 2);
+
+  Tensor *Q = linear_t(mem, wq2, x_new);
+  Q = reshape_t(mem, Q, S(B, T, H, d_k), 4);
+
+  Tensor *K = linear_t(mem, wk2, x_new);
+  K = reshape_t(mem, K, S(B, T, H, d_k), 4);
+
+  Tensor *V = linear_t(mem, wv2, x_new);
+  V = reshape_t(mem, V, S(B, T, H, d_k), 4);
+
+  Q = permute_t(mem, Q, S(0, 2, 1, 3), 4);
+  K = permute_t(mem, K, S(0, 2, 1, 3), 4);
+  V = permute_t(mem, V, S(0, 2, 1, 3), 4);
+
+  Pair_T result_ = scaled_dot_product_attention(mem, Q, K, V, src_mask);
+  Tensor *attn2 = result_.S;
+  attn2 = reshape_t(mem, attn2, S(B * T, D), 2);
+  attn2 = linear_t(mem, wo2, attn2);
+  attn2 = reshape_t(mem, attn2, S(B, T, D), 3);
+
+  Tensor *xx = add_norm(mem, x_, attn2, norm2);
+  Tensor *ffout = feed_forward(mem, xx, w1, w2);
+
+  Tensor *x_final = add_norm(mem, xx, ffout, norm3);
+  return x_final;
+}
+
 int main() {
   Memory *mem = create_global_mem(1ULL * 10 * 1024 * 1024 * 1024);
   ParameterList *pl = create_param_list(mem);
@@ -134,6 +198,7 @@ int main() {
   Tensor *sub_layer = tensor_xavier(mem, S(B, T, D), 3, PERM);
   LayerNorm *l = create_layernorm(mem, pl, D, 1e-5);
   Tensor *out = add_norm(mem, x, sub_layer, l);
+  backward(mem, out);
 
   print_tensor_shape(out);
   free_global_mem(mem);
