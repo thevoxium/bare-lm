@@ -73,6 +73,32 @@ Tensor *feed_forward(Memory *mem, Tensor *x, Linear *w1, Linear *w2) {
   return out;
 }
 
+Tensor *multi_head_attention(Memory *mem, Tensor *x, Linear *wq, Linear *wk,
+                             Linear *wv, Linear *wo, Tensor *mask) {
+  Tensor *x_ = reshape_t(mem, x, S(B * T, D), 2);
+  Tensor *Q = linear_t(mem, wq, x_);
+  Tensor *K = linear_t(mem, wk, x_);
+  Tensor *V = linear_t(mem, wv, x_);
+
+  Q = reshape_t(mem, Q, S(B, T, H, d_k), 4);
+  K = reshape_t(mem, K, S(B, T, H, d_k), 4);
+  V = reshape_t(mem, V, S(B, T, H, d_k), 4);
+
+  Q = permute_t(mem, Q, S(0, 2, 1, 3), 4);
+  K = permute_t(mem, K, S(0, 2, 1, 3), 4);
+  V = permute_t(mem, V, S(0, 2, 1, 3), 4);
+
+  Pair_T result = scaled_dot_product_attention(mem, Q, K, V, mask);
+  Tensor *out = result.F;
+  out = permute_t(mem, out, S(0, 2, 1, 3), 4);
+  out = reshape_t(mem, out, S(B * T, D), 2);
+
+  Tensor *out_final = linear_t(mem, wo, out);
+  out_final = reshape_t(mem, out_final, S(B, T, D), 3);
+
+  return out_final;
+}
+
 int main() {
   Memory *mem = create_global_mem(1ULL * 10 * 1024 * 1024 * 1024);
   ParameterList *pl = create_param_list(mem);
@@ -90,9 +116,14 @@ int main() {
   Linear *w2 = create_linear(mem, pl, D_ff, D);
 
   Tensor *x = tensor_xavier(mem, S(B, T, D), 3, PERM);
-  Tensor *out = feed_forward(mem, x, w1, w2);
+  // Tensor *out = feed_forward(mem, x, w1, w2);
 
-  print_tensor_shape(out);
+  Linear *wq = create_linear(mem, pl, D, D);
+  Linear *wk = create_linear(mem, pl, D, D);
+  Linear *wv = create_linear(mem, pl, D, D);
+  Linear *wo = create_linear(mem, pl, D, D);
+
+  Tensor *out = multi_head_attention(mem, x, wq, wk, wv, wo, NULL);
 
   free_global_mem(mem);
   return 0;
