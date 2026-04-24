@@ -25,6 +25,13 @@ Tensor *create_positional_encodings(Memory *mem, int T, int D) {
   return pe;
 }
 
+Pair_T scaled_dot_product_attention(Tensor *Q, Tensor *K, Tensor *V) {
+  Pair_T result;
+  print_tensor_shape(Q);
+
+  return result;
+}
+
 int main() {
   Memory *mem = create_global_mem(1024 * 1024 * 1024);
   ParameterList *pl = create_param_list(mem);
@@ -34,10 +41,15 @@ int main() {
   int D = 512;
   int H = 8;
   int d_k = D / H;
-  int V = 512;
+  int Vocab = 512;
 
   Tensor *pe = create_positional_encodings(mem, T, D);
-  print_t(pe, 0);
+
+  Tensor *Q = tensor_xavier(mem, S(B, H, T, d_k), 4, PERM);
+  Tensor *K = tensor_xavier(mem, S(B, H, T, d_k), 4, PERM);
+  Tensor *V = tensor_xavier(mem, S(B, H, T, d_k), 4, PERM);
+
+  Pair_T attention_result = scaled_dot_product_attention(Q, K, V);
 
   free_global_mem(mem);
   return 0;
