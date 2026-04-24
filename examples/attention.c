@@ -9,6 +9,7 @@
 #define H 1
 #define d_k 64
 #define Vocab 64
+#define D_ff 32
 
 Tensor *create_positional_encodings(Memory *mem) {
   CHECK(D % 2 == 0, "create_positional_encodings: D should be even");
@@ -63,6 +64,13 @@ Pair_T scaled_dot_product_attention(Memory *mem, Tensor *Q, Tensor *K,
   return result;
 }
 
+Tensor *feed_forward(Memory *mem, Tensor *x, Linear *w1, Linear *w2) {
+  Tensor *out = linear_t(mem, w1, x);
+  out = relu_t(mem, out);
+  out = linear_t(mem, w2, out);
+  return out;
+}
+
 int main() {
   Memory *mem = create_global_mem(1ULL * 10 * 1024 * 1024 * 1024);
   ParameterList *pl = create_param_list(mem);
@@ -75,8 +83,14 @@ int main() {
   Tensor *V = tensor_xavier(mem, S(B, H, T, d_k), 4, PERM);
 
   Pair_T attention_result = scaled_dot_product_attention(mem, Q, K, V, NULL);
-  print_tensor_shape(attention_result.F);
-  print_tensor_shape(attention_result.S);
+
+  Linear *w1 = create_linear(mem, pl, D, D_ff);
+  Linear *w2 = create_linear(mem, pl, D_ff, D);
+
+  Tensor *x = tensor_xavier(mem, S(B, T, D), 3, PERM);
+  Tensor *out = feed_forward(mem, x, w1, w2);
+
+  print_tensor_shape(out);
 
   free_global_mem(mem);
   return 0;
