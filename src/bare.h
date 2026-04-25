@@ -1,8 +1,6 @@
 #ifndef BARE_H
 #define BARE_H
 
-#include <cblas.h>
-#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
