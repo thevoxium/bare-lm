@@ -30,7 +30,7 @@ shared:
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(SRC) $(SHARED_LDFLAGS) $(LDFLAGS) -o $(OUT)
 
-install: 
+install: shared 
 	mkdir -p $(PREFIX)/include
 	mkdir -p $(PREFIX)/lib
 	cp src/bare.h $(PREFIX)/include/
@@ -48,6 +48,7 @@ ARTIFACT ?= unknown
 RELEASE_DIR = $(BUILD_DIR)/bare-$(VERSION)-$(ARTIFACT)
 
 release: 
+	$(MAKE) shared
 	mkdir -p $(RELEASE_DIR)/lib
 	mkdir -p $(RELEASE_DIR)/include
 
