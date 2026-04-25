@@ -1,6 +1,6 @@
 # bare-lm
 
-A minimal autograd tensor library in C. Arena-based memory, zero dependencies beyond libc.
+A minimal autograd tensor library in C.
 
 
 ## Installation
