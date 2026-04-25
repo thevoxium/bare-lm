@@ -4,85 +4,71 @@ A minimal autograd tensor library in C. Arena-based memory, zero dependencies be
 
 NOTE: examples & API will CHANGE a lot. This is under active developement.
 
-## Build & Run (Cross-Platform)
+## Installation
 
-This project depends on:
+You can install `bare-lm` in two ways.
+
+### Option 1: Build and install from source
+
+Requirements:
 - A C compiler (`cc`, `gcc`, or `clang`)
 - `make`
 - OpenBLAS (headers + library)
-- `pkg-config` (recommended, for auto-detecting OpenBLAS)
-- Optional: `valgrind` for memory checks
 
-### 1) Install dependencies
-
-#### macOS (Homebrew)
+Install OpenBLAS first:
 
 ```bash
-brew install gcc openblas pkg-config
-# optional
-brew install valgrind
+# macOS (Homebrew)
+brew install openblas
+
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y libopenblas-dev
 ```
 
-If `cc` on your machine does not work as expected, try GCC explicitly:
+Then build and install:
 
 ```bash
-make run FILE=examples/xor.c CC=gcc-15
+git clone https://github.com/thevoxium/bare-lm.git
+cd bare-lm
+
+# macOS
+make OPENBLAS_PREFIX=/opt/homebrew/opt/openblas
+
+# Linux
+make
+
+sudo make install
 ```
 
-#### Ubuntu / Debian
+By default this installs to `/usr/local/include/bare.h` and `/usr/local/lib/libbare.{so,dylib}`.
+
+### Option 2: Install from GitHub Release tarball
+
+Each tagged release publishes prebuilt archives for Linux and macOS:
+- `bare-<version>-linux.tar.gz`
+- `bare-<version>-macos.tar.gz`
+
+After downloading and extracting a release tarball, install headers and library:
 
 ```bash
-sudo apt update
-sudo apt install -y build-essential libopenblas-dev pkg-config valgrind
+tar -xzf bare-<version>-<artifact>.tar.gz
+cd bare-<version>-<artifact>
+sudo cp include/bare.h /usr/local/include/
+sudo cp lib/libbare.* /usr/local/lib/
 ```
 
-#### Windows
-
-Use WSL (Ubuntu/Debian) and follow the Linux steps above.
-
-### 2) See available Make targets
+## Using the library
 
 ```bash
-make help
+cc file.c -lbare
 ```
 
-### 3) Common commands
-
-```bash
-make run FILE=examples/xor.c               # build and run
-make asan FILE=examples/xor.c              # address + undefined behavior sanitizers
-make time FILE=examples/xor.c              # run with timing
-make valgrind FILE=examples/xor.c          # run with valgrind
-make test                                  # compile and run examples/test.c
-make clean                                 # remove build artifacts
-```
-
-### 4) Useful overrides
-
-```bash
-make run FILE=examples/xor.c CC=gcc        # choose compiler
-make run FILE=examples/xor.c perf=1        # enable -O3 -march=native -ffast-math
-```
-
-If OpenBLAS is installed in a non-standard location and `pkg-config` cannot find it:
-
-```bash
-make run FILE=examples/xor.c OPENBLAS_PATH=/path/to/openblas
-```
-
-### 5) Troubleshooting
-
-- `fatal error: cblas.h: No such file or directory`
-  - Install OpenBLAS dev headers (`libopenblas-dev` on Linux, `openblas` on Homebrew).
-- Linker error for `-lopenblas`
-  - Install OpenBLAS and ensure library paths are visible, or set `OPENBLAS_PATH=...`.
-- `valgrind` not found
-  - Install `valgrind`, or skip the `make valgrind` target.
+If your system does not search `/usr/local/lib` by default, add `-L/usr/local/lib` and `-I/usr/local/include`.
 
 ## Example: XOR with a 2-layer MLP
 
 ```c
-#include "src/bare.h"
+#include "bare.h"
 
 int main() {
   Memory *mem = create_global_mem(1 << 28);
