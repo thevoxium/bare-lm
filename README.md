@@ -2,7 +2,6 @@
 
 A minimal autograd tensor library in C. Arena-based memory, zero dependencies beyond libc.
 
-NOTE: examples & API will CHANGE a lot. This is under active developement.
 
 ## Installation
 
