@@ -16,3 +16,4 @@ perf*
 examples/small_llm.c
 web/
 papers.md
+release.md
