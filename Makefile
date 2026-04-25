@@ -24,7 +24,7 @@ ifneq ($(OPENBLAS_PREFIX),)
     LDFLAGS += -L$(OPENBLAS_PREFIX)/lib
 endif
 
-.PHONY: shared install uninstall clean
+.PHONY: shared install release uninstall clean
 
 shared:
 	mkdir -p $(BUILD_DIR)
@@ -41,3 +41,17 @@ uninstall:
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+VERSION ?= 0.1.0
+ARTIFACT ?= unknown
+
+RELEASE_DIR = $(BUILD_DIR)/bare-$(VERSION)-$(ARTIFACT)
+
+release: 
+	mkdir -p $(RELEASE_DIR)/lib
+	mkdir -p $(RELEASE_DIR)/include
+
+	cp $(OUT) $(RELEASE_DIR)/lib/
+	cp src/bare.h $(RELEASE_DIR)/include/
+
+	tar -czf $(BUILD_DIR)/bare-$(VERSION)-$(ARTIFACT).tar.gz -C $(BUILD_DIR) bare-$(VERSION)-$(ARTIFACT)
