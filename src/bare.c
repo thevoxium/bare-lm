@@ -58,11 +58,22 @@ void *allocate_mem(Memory *mem, size_t size, uint8_t perm) {
 }
 
 void free_global_mem(Memory *mem) {
-  CHECK_VOID(mem, "free_global_mem: mem is NULL");
+  // although we can just check mem here and it will work & it enough
+  // but in future if we allow partial init of perm and temp allocation it may
+  // fail
+  CHECK_VOID(mem->perm->buffer, "free_global_mem: perm buffer is NULL");
   free(mem->perm->buffer);
+
+  CHECK_VOID(mem->temp->buffer, "free_global_mem: temp buffer is NULL");
   free(mem->temp->buffer);
+
+  CHECK_VOID(mem->temp, "free_global_mem: temp is NULL");
   free(mem->temp);
+
+  CHECK_VOID(mem->perm, "free_global_mem: perm is NULL");
   free(mem->perm);
+
+  CHECK_VOID(mem, "free_global_mem: mem is NULL");
   free(mem);
 }
 
@@ -892,7 +903,7 @@ static void backward_cos(Tensor *self) {
   int N = self->numel;
   if (a->contiguous && self->contiguous) {
     for (int i = 0; i < N; i++) {
-      a->grad[i] += self->grad[i] * (-sin(self->data[i]));
+      a->grad[i] += self->grad[i] * (-sin(a->data[i]));
     }
     return;
   }
@@ -904,7 +915,7 @@ static void backward_cos(Tensor *self) {
   int *strides[2] = {a->strides, self->strides};
 
   for (int i = 0; i < N; i++) {
-    a->grad[offs[0]] += self->grad[offs[1]] * (-sin(a->data[offs[1]]));
+    a->grad[offs[0]] += self->grad[offs[1]] * (-sin(a->data[offs[0]]));
     advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
@@ -944,7 +955,7 @@ static void backward_sin(Tensor *self) {
   int N = self->numel;
   if (a->contiguous && self->contiguous) {
     for (int i = 0; i < N; i++) {
-      a->grad[i] += self->grad[i] * cos(self->data[i]);
+      a->grad[i] += self->grad[i] * cos(a->data[i]);
     }
     return;
   }
@@ -956,7 +967,7 @@ static void backward_sin(Tensor *self) {
   int *strides[2] = {a->strides, self->strides};
 
   for (int i = 0; i < N; i++) {
-    a->grad[offs[0]] += self->grad[offs[1]] * cos(a->data[offs[1]]);
+    a->grad[offs[0]] += self->grad[offs[1]] * cos(a->data[offs[0]]);
     advance_offsets(ndim, idx, self->shape, 2, offs, strides);
   }
 }
@@ -1969,9 +1980,12 @@ Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out) {
 }
 
 Tensor *linear_t(Memory *mem, Linear *l, Tensor *x) {
-  CHECK(x, "linear_t: x is NULL");
+  CHECK(x && l, "linear_t: one of the param is NULL");
 
   Tensor *W = l->weights;
+  CHECK(x->ndim == 2 && x->shape[1] == W->shape[1],
+        "linear_t: input and weight shapes are not compatible");
+
   Tensor *b = l->bias;
   Tensor *wT = transpose_t(mem, W);
 
@@ -2006,7 +2020,7 @@ LayerNorm *create_layernorm(Memory *mem, ParameterList *pl,
 }
 
 Tensor *layernorm_t(Memory *mem, LayerNorm *ln, Tensor *x) {
-  CHECK(x, "layernorm_t: x is NULL");
+  CHECK(x && ln, "layernorm_t: one of the param is NULL");
 
   int last_dim = x->ndim - 1;
 
