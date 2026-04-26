@@ -2384,6 +2384,15 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   CHECK(a && dims && total_dim == a->ndim,
         "permute_t: a is NULL, dims is NULL, or invalid dimensions");
 
+  int seen[total_dim];
+  memset(seen, 0, sizeof(seen));
+  for (int i = 0; i < total_dim; i++) {
+    CHECK(dims[i] >= 0 && dims[i] < total_dim,
+          "permute_t: dims contains out-of-range index");
+    CHECK(!seen[dims[i]], "permute_t: dims contains duplicate axis");
+    seen[dims[i]] = 1;
+  }
+
   Tensor *r =
       tensor_view_init(mem, a, a->ndim, a->numel, 0, PERMUTE, backward_permute);
   CHECK(r, "permute_t: tensor_view_init failed");
