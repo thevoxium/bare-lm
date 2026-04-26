@@ -1731,22 +1731,49 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
   }
   CHECK(numel == a->numel, "reshape_t: numel does not match");
 
+  if (a->contiguous) {
+    Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
+    CHECK(r, "reshape_t: allocate_mem failed");
+
+    r->data = a->data;
+    r->grad = (float *)allocate_mem(mem, sizeof(float) * numel, TEMP);
+    r->shape = (int *)allocate_mem(mem, sizeof(int) * ndim, TEMP);
+    r->strides = (int *)allocate_mem(mem, sizeof(int) * ndim, TEMP);
+    CHECK(r->grad && r->shape && r->strides,
+          "reshape_t: grad, shape, stride allocation failed");
+
+    memset(r->grad, 0, sizeof(float) * numel);
+    for (int i = 0; i < ndim; i++) {
+      r->shape[i] = shape[i];
+    }
+
+    r->strides[ndim - 1] = 1;
+    for (int i = ndim - 2; i >= 0; i--) {
+      r->strides[i] = r->strides[i + 1] * r->shape[i + 1];
+    }
+
+    r->ndim = ndim;
+    r->numel = numel;
+    r->visited_gen = a->visited_gen;
+    r->contiguous = 1;
+    r->dt = a->dt;
+    r->parents[0] = a;
+    r->parents[1] = NULL;
+    r->op = RESHAPE;
+    r->backward = backward_reshape;
+    return r;
+  }
+
   Tensor *r = tensor_zeros(mem, shape, ndim, TEMP);
   CHECK(r, "reshape_t: result tensor failed");
 
-  if (a->contiguous) {
-    for (int i = 0; i < numel; i++) {
-      r->data[i] = a->data[i];
-    }
-  } else {
-    int idx[a->ndim];
-    memset(idx, 0, sizeof(idx));
-    int offs[1] = {0};
-    int *strides[1] = {a->strides};
-    for (int i = 0; i < numel; i++) {
-      r->data[i] = a->data[offs[0]];
-      advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
-    }
+  int idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[1] = {0};
+  int *strides[1] = {a->strides};
+  for (int i = 0; i < numel; i++) {
+    r->data[i] = a->data[offs[0]];
+    advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
   }
 
   r->parents[0] = a;
