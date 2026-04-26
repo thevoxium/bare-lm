@@ -64,6 +64,7 @@ typedef enum Op {
   CONCAT,
   SLICE,
   PERMUTE,
+  CONTIGUOS,
   SOFTMAX,
   EMBEDDING,
   SIN,
@@ -177,7 +178,6 @@ void backward(Memory *mem, Tensor *root);
 int element_size(Tensor *a);
 int nbytes(Tensor *a);
 uint8_t is_floating_point(Tensor *a);
-int *tensor_size(Memory *mem, Tensor *a);
 void print_tensor_shape(Tensor *a);
 float item(Tensor *a);
 
@@ -231,6 +231,7 @@ Tensor *scale_t(Memory *mem, Tensor *a, float v);
 Tensor *concat_t(Memory *mem, Tensor *a, Tensor *b, int dim);
 Pair_T *slice_t(Memory *mem, Tensor *a, int dim, int split_size);
 Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim);
+Tensor *contiguos_t(Memory *mem, Tensor *a);
 Tensor *softmax_t(Memory *mem, Tensor *a, int dim);
 void replace_t(Tensor *a, Tensor *b);
 void detach_t(Tensor *a);

@@ -244,17 +244,6 @@ uint8_t is_floating_point(Tensor *a) {
   return 0;
 }
 
-int *tensor_size(Memory *mem, Tensor *a) {
-  if (a) {
-    int *shape = (int *)allocate_mem(mem, a->ndim * sizeof(int), TEMP);
-    for (int i = 0; i < a->ndim; i++) {
-      shape[i] = a->shape[i];
-    }
-    return shape;
-  }
-  return NULL;
-}
-
 float item(Tensor *a) {
   if (a && a->numel == 1) {
     return a->data[0];
@@ -307,6 +296,7 @@ Tensor *tensor_init(Memory *mem, int *shape, int ndim, uint8_t perm) {
   t->backward = NULL;
   t->dt = fp32;
   t->contiguous = 1;
+  t->visited_gen = 0;
 
   return t;
 }
@@ -1692,6 +1682,7 @@ Tensor *transpose_t(Memory *mem, Tensor *a) {
   r->strides = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
   CHECK(r->grad && r->shape && r->strides,
         "transpose_t: grad, shape, stride allocation failed");
+  memset(r->grad, 0, sizeof(float) * a->numel);
   r->shape[0] = a->shape[1];
   r->shape[1] = a->shape[0];
   r->strides[0] = a->strides[1];
@@ -2400,6 +2391,55 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   return r;
 }
 
+static void backward_contiguos(Tensor *self) {
+  Tensor *a = self->parents[0];
+  int N = self->numel;
+
+  if (a->contiguous) {
+    for (int i = 0; i < N; i++) {
+      a->grad[i] += self->grad[i];
+    }
+    return;
+  }
+
+  int idx[a->ndim];
+  memset(idx, 0, sizeof(idx));
+  int offs[1] = {0};
+  int *strides[1] = {a->strides};
+  for (int i = 0; i < N; i++) {
+    a->grad[offs[0]] += self->grad[i];
+    advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
+  }
+}
+
+Tensor *contiguos_t(Memory *mem, Tensor *a) {
+  CHECK(a, "contiguos_t: a is NULL");
+
+  Tensor *r = tensor_zeros(mem, a->shape, a->ndim, TEMP);
+  CHECK(r, "contiguos_t: failed to create result tensor");
+
+  if (a->contiguous) {
+    for (int i = 0; i < a->numel; i++) {
+      r->data[i] = a->data[i];
+    }
+  } else {
+    int idx[a->ndim];
+    memset(idx, 0, sizeof(idx));
+    int offs[1] = {0};
+    int *strides[1] = {a->strides};
+    for (int i = 0; i < a->numel; i++) {
+      r->data[i] = a->data[offs[0]];
+      advance_offsets(a->ndim, idx, a->shape, 1, offs, strides);
+    }
+  }
+
+  r->op = CONTIGUOS;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->backward = backward_contiguos;
+  return r;
+}
+
 static void backward_softmax(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *r = self;
@@ -2726,6 +2766,7 @@ void detach_t(Tensor *a) {
   CHECK_VOID(a, "detach_t: invalid params");
   a->parents[0] = NULL;
   a->parents[1] = NULL;
+  a->backward = NULL;
 }
 
 Pair_T get_batch(Memory *mem, int batch_size, Tensor *input, Tensor *output) {
