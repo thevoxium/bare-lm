@@ -457,6 +457,43 @@ static inline void advance_offsets(int ndim, int *idx, int *shape, int n_offs,
   }
 }
 
+static void fill_contiguous_strides(int *shape, int ndim, int *strides) {
+  if (ndim <= 0) {
+    return;
+  }
+
+  strides[ndim - 1] = 1;
+  for (int i = ndim - 2; i >= 0; i--) {
+    strides[i] = strides[i + 1] * shape[i + 1];
+  }
+}
+
+static Tensor *tensor_view_init(Memory *mem, Tensor *a, int ndim, int numel,
+                                uint8_t contiguous, Op op,
+                                void (*backward)(Tensor *self)) {
+  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
+  CHECK(r, "tensor_view_init: allocate_mem failed");
+
+  r->data = a->data;
+  r->grad = (float *)allocate_mem(mem, sizeof(float) * numel, TEMP);
+  r->shape = (int *)allocate_mem(mem, sizeof(int) * ndim, TEMP);
+  r->strides = (int *)allocate_mem(mem, sizeof(int) * ndim, TEMP);
+  CHECK(r->grad && r->shape && r->strides,
+        "tensor_view_init: grad, shape, stride allocation failed");
+
+  memset(r->grad, 0, sizeof(float) * numel);
+  r->ndim = ndim;
+  r->numel = numel;
+  r->visited_gen = a->visited_gen;
+  r->contiguous = contiguous;
+  r->dt = a->dt;
+  r->parents[0] = a;
+  r->parents[1] = NULL;
+  r->op = op;
+  r->backward = backward;
+  return r;
+}
+
 static void backward_add(Tensor *self) {
   Tensor *a = self->parents[0];
   Tensor *b = self->parents[1];
@@ -1678,28 +1715,15 @@ static void backward_transpose(Tensor *self) {
 Tensor *transpose_t(Memory *mem, Tensor *a) {
   CHECK(a && a->ndim == 2, "transpose_t: a is NULL or not a 2D tensor");
 
-  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
-  CHECK(r, "transpose_t: allocate_mem failed");
-  r->data = a->data;
-  r->grad = (float *)allocate_mem(mem, sizeof(float) * a->numel, TEMP);
-  r->shape = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
-  r->strides = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
-  CHECK(r->grad && r->shape && r->strides,
-        "transpose_t: grad, shape, stride allocation failed");
-  memset(r->grad, 0, sizeof(float) * a->numel);
+  Tensor *r = tensor_view_init(mem, a, a->ndim, a->numel, 0, TRANSPOSE,
+                               backward_transpose);
+  CHECK(r, "transpose_t: tensor_view_init failed");
+
   r->shape[0] = a->shape[1];
   r->shape[1] = a->shape[0];
   r->strides[0] = a->strides[1];
   r->strides[1] = a->strides[0];
-  r->ndim = a->ndim;
-  r->numel = a->numel;
-  r->visited_gen = a->visited_gen;
-  r->contiguous = 0;
-  r->dt = fp32;
-  r->parents[0] = a;
-  r->parents[1] = NULL;
-  r->backward = backward_transpose;
-  r->op = TRANSPOSE;
+
   return r;
 }
 
@@ -1732,35 +1756,15 @@ Tensor *reshape_t(Memory *mem, Tensor *a, int *shape, int ndim) {
   CHECK(numel == a->numel, "reshape_t: numel does not match");
 
   if (a->contiguous) {
-    Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
-    CHECK(r, "reshape_t: allocate_mem failed");
+    Tensor *r =
+        tensor_view_init(mem, a, ndim, numel, 1, RESHAPE, backward_reshape);
+    CHECK(r, "reshape_t: tensor_view_init failed");
 
-    r->data = a->data;
-    r->grad = (float *)allocate_mem(mem, sizeof(float) * numel, TEMP);
-    r->shape = (int *)allocate_mem(mem, sizeof(int) * ndim, TEMP);
-    r->strides = (int *)allocate_mem(mem, sizeof(int) * ndim, TEMP);
-    CHECK(r->grad && r->shape && r->strides,
-          "reshape_t: grad, shape, stride allocation failed");
-
-    memset(r->grad, 0, sizeof(float) * numel);
     for (int i = 0; i < ndim; i++) {
       r->shape[i] = shape[i];
     }
 
-    r->strides[ndim - 1] = 1;
-    for (int i = ndim - 2; i >= 0; i--) {
-      r->strides[i] = r->strides[i + 1] * r->shape[i + 1];
-    }
-
-    r->ndim = ndim;
-    r->numel = numel;
-    r->visited_gen = a->visited_gen;
-    r->contiguous = 1;
-    r->dt = a->dt;
-    r->parents[0] = a;
-    r->parents[1] = NULL;
-    r->op = RESHAPE;
-    r->backward = backward_reshape;
+    fill_contiguous_strides(r->shape, ndim, r->strides);
     return r;
   }
 
@@ -1868,15 +1872,10 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
     numel *= shape[i];
   }
 
-  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
-  CHECK(r, "broadcast_t: allocate_mem failed");
-  r->data = a->data;
-  r->grad = (float *)allocate_mem(mem, sizeof(float) * numel, TEMP);
-  r->shape = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
-  r->strides = (int *)allocate_mem(mem, sizeof(int) * tar_dim, TEMP);
-  CHECK(r->grad && r->shape && r->strides,
-        "broadcast_t: grad, shape, stride allocation failed");
-  memset(r->grad, 0, sizeof(float) * numel);
+  Tensor *r = tensor_view_init(mem, a, tar_dim, numel, 0, BROADCAST,
+                               backward_broadcast);
+  CHECK(r, "broadcast_t: tensor_view_init failed");
+
   for (int i = 0; i < tar_dim; i++) {
     r->shape[i] = shape[i];
   }
@@ -1887,15 +1886,6 @@ Tensor *broadcast_t(Memory *mem, Tensor *a, int *shape, int tar_dim) {
       r->strides[i] = a->strides[i - (tar_dim - a->ndim)];
   }
 
-  r->ndim = tar_dim;
-  r->numel = numel;
-  r->visited_gen = a->visited_gen;
-  r->contiguous = 0;
-  r->dt = fp32;
-  r->parents[0] = a;
-  r->parents[1] = NULL;
-  r->backward = backward_broadcast;
-  r->op = BROADCAST;
   return r;
 }
 
@@ -2394,30 +2384,15 @@ Tensor *permute_t(Memory *mem, Tensor *a, int *dims, int total_dim) {
   CHECK(a && dims && total_dim == a->ndim,
         "permute_t: a is NULL, dims is NULL, or invalid dimensions");
 
-  Tensor *r = (Tensor *)allocate_mem(mem, sizeof(Tensor), TEMP);
-  CHECK(r, "permute_t: allocate_mem failed");
-  r->data = a->data;
-  r->grad = (float *)allocate_mem(mem, sizeof(float) * a->numel, TEMP);
-  memset(r->grad, 0, sizeof(float) * a->numel);
-  r->shape = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
-  r->strides = (int *)allocate_mem(mem, sizeof(int) * a->ndim, TEMP);
-  CHECK(r->grad && r->shape && r->strides,
-        "transpose_t: grad, shape, stride allocation failed");
+  Tensor *r =
+      tensor_view_init(mem, a, a->ndim, a->numel, 0, PERMUTE, backward_permute);
+  CHECK(r, "permute_t: tensor_view_init failed");
 
   for (int i = 0; i < total_dim; i++) {
     r->shape[i] = a->shape[dims[i]];
     r->strides[i] = a->strides[dims[i]];
   }
 
-  r->ndim = a->ndim;
-  r->numel = a->numel;
-  r->visited_gen = a->visited_gen;
-  r->contiguous = 0;
-  r->dt = fp32;
-  r->op = PERMUTE;
-  r->parents[0] = a;
-  r->parents[1] = NULL;
-  r->backward = backward_permute;
   return r;
 }
 
