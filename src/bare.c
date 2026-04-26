@@ -2749,9 +2749,8 @@ void mem_stats(Memory *mem) {
 void replace_t(Tensor *a, Tensor *b) {
   CHECK_VOID(check_op_compatibilty(a, b), "replace_t: not compatible");
   if (a->contiguous && b->contiguous) {
-    for (int i = 0; i < a->numel; i++) {
-      a->data[i] = b->data[i];
-    }
+    memcpy(a->data, b->data, sizeof(float) * a->numel);
+    memcpy(a->grad, b->grad, sizeof(float) * a->numel);
   } else {
     int N = a->numel;
     int idx[a->ndim];
@@ -2760,7 +2759,8 @@ void replace_t(Tensor *a, Tensor *b) {
     int *strides[2] = {a->strides, b->strides};
     for (int i = 0; i < N; i++) {
       a->data[offs[0]] = b->data[offs[1]];
-      advance_offsets(a->ndim, idx, b->shape, 2, offs, strides);
+      a->grad[offs[0]] = b->grad[offs[1]];
+      advance_offsets(a->ndim, idx, a->shape, 2, offs, strides);
     }
   }
 }
