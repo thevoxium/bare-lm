@@ -1569,6 +1569,8 @@ Tensor *matmul_t(Memory *mem, Tensor *a, Tensor *b) {
             a->shape[1] == b->shape[0],
         "matmul_t: a is NULL, b is NULL, or tensors are not compatible 2D "
         "matrices");
+  CHECK(a->contiguous && b->contiguous,
+        "matmul_t: input tensors must be contiguos");
   int M = a->shape[0];
   int K = a->shape[1];
   int N = b->shape[1];
@@ -1627,6 +1629,8 @@ Tensor *bmm_t(Memory *mem, Tensor *a, Tensor *b) {
 
   CHECK(a->shape[0] == b->shape[0], "bmm_t: batch size mismatch");
   CHECK(a->shape[2] == b->shape[1], "bmm_t: K mismatch");
+  CHECK(a->contiguous && b->contiguous,
+        "bmm_t: input tensors must be contiguos");
 
   int B = a->shape[0];
   int M = a->shape[1];
@@ -1956,7 +1960,7 @@ Linear *create_linear(Memory *mem, ParameterList *pl, int d_in, int d_out) {
   Linear *l = (Linear *)allocate_mem(mem, sizeof(Linear), PERM);
   CHECK(l, "create_linear: failed to allocate Linear struct");
 
-  int weight_shape[] = {d_out, d_in};
+  int weight_shape[] = {d_in, d_out};
   int bias_shape[] = {d_out};
   l->weights = tensor_xavier(mem, weight_shape, 2, PERM);
   CHECK(l->weights, "create_linear: failed to create weights tensor");
@@ -1974,16 +1978,15 @@ Tensor *linear_t(Memory *mem, Linear *l, Tensor *x) {
   CHECK(x && l, "linear_t: one of the param is NULL");
 
   Tensor *W = l->weights;
-  CHECK(x->ndim == 2 && x->shape[1] == W->shape[1],
+  CHECK(x->ndim == 2 && x->shape[1] == W->shape[0],
         "linear_t: input and weight shapes are not compatible");
 
   Tensor *b = l->bias;
-  Tensor *wT = transpose_t(mem, W);
 
-  int shape[] = {x->shape[0], l->weights->shape[0]};
+  int shape[] = {x->shape[0], l->weights->shape[1]};
 
   b = broadcast_t(mem, b, shape, 2);
-  Tensor *out = matmul_t(mem, x, wT);
+  Tensor *out = matmul_t(mem, x, W);
   out = add_t(mem, out, b);
   return out;
 }
